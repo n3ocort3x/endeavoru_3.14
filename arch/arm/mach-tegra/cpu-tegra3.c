@@ -1133,10 +1133,10 @@ void tegra_auto_hotplug_governor(unsigned int cpu_freq, bool suspend)
 		bottom_freq = idle_bottom_freq;
 
 #if defined(CONFIG_BEST_TRADE_HOTPLUG)
-        if (likely(bthp_en)) {
-            bthp_cpuup_standalone (cpu_freq);
-            return;
-        }
+	        if (likely(bthp_en)) {
+			bthp_cpuup_standalone (cpu_freq);
+			return;
+	        }
 #endif
 	}
 

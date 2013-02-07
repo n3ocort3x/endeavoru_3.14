@@ -296,7 +296,7 @@ struct mtp_device_status {
 
 /* temporary variable used between mtp_open() and mtp_gadget_bind() */
 static struct mtp_dev *_mtp_dev;
-
+void tegra_udc_set_phy_clk(bool pull_up);
 static void mtp_setup_perflock(struct work_struct *data)
 {
 	struct mtp_dev *dev = _mtp_dev;
@@ -306,6 +306,7 @@ static void mtp_setup_perflock(struct work_struct *data)
 	if (dev->mtp_perf_lock_on) {
 		printk(KERN_INFO "[USB][MTP] %s, perf on\n", __func__);
 		if (release_screen_off_flag) {
+			tegra_udc_set_phy_clk(true);
 			release_screen_off_freq_lock(PM_QOS_CPU_FREQ_MAX_DEFAULT_VALUE);
 			release_screen_off_flag = 0;
 		}
@@ -319,6 +320,7 @@ static void mtp_setup_perflock(struct work_struct *data)
 		if (!release_screen_off_flag) {
 			lock_screen_off_freq_lock();
 			release_screen_off_flag = 1;
+			tegra_udc_set_phy_clk(false);
 		}
 	}
 }
