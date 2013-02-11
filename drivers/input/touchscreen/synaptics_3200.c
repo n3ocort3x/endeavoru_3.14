@@ -937,7 +937,7 @@ static ssize_t syn_unlock_store(struct device *dev,
 {
 	struct synaptics_ts_data *ts;
 	int unlock = -1;
-	int ret;
+	int ret = 0;
 
 	ts = gl_ts;
 
@@ -948,18 +948,18 @@ static ssize_t syn_unlock_store(struct device *dev,
 
 	if (unlock == 2 && ts->first_pressed && ts->pre_finger_data[0][0] < 2) {
 		printk(KERN_INFO "[TP] Touch: unlock if case\n");
-		if (ts->packrat_number < SYNAPTICS_FW_NOCAL_PACKRAT) {
-			ts->pre_finger_data[0][0] = 2;
-			if(ts->psensor_detection) {
-				if(ts->psensor_resume_enable == 1) {
-					printk(KERN_INFO "[TP] %s: Disable P-sensor by Touch\n", __func__);
-					psensor_enable_by_touch_driver(0);
-					ts->psensor_resume_enable = 0;
-				}
-				else if(ts->psensor_resume_enable == 2) {
-					ts->psensor_resume_enable = 0;
-				}
+		ts->pre_finger_data[0][0] = 2;
+		if(ts->psensor_detection) {
+			if(ts->psensor_resume_enable == 1) {
+				printk(KERN_INFO "[TP] %s: Disable P-sensor by Touch\n", __func__);
+				psensor_enable_by_touch_driver(0);
+				ts->psensor_resume_enable = 0;
 			}
+			else if(ts->psensor_resume_enable == 2) {
+				ts->psensor_resume_enable = 0;
+			}
+		}
+		if (ts->packrat_number < SYNAPTICS_FW_NOCAL_PACKRAT) {
 #ifdef SYN_CALIBRATION_CONTROL
 			ret = i2c_syn_write_byte_data(ts->client,
 				get_address_base(ts, 0x54, CONTROL_BASE) + 0x10, 0x0);
@@ -996,11 +996,11 @@ static ssize_t syn_unlock_store(struct device *dev,
 				return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "w:5", __func__);
 
 			if (ts->multitouch_calibration) {
-			ret = i2c_syn_write_byte_data(ts->client,
-				get_address_base(ts, 0x11, COMMAND_BASE), 0x01);
-			if (ret < 0)
-					return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "w:6", __func__);
-			printk(KERN_INFO "[TP] %s: Touch Calibration Confirmed, rezero\n", __func__);
+				ret = i2c_syn_write_byte_data(ts->client,
+					get_address_base(ts, 0x11, COMMAND_BASE), 0x01);
+				if (ret < 0)
+						return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "w:6", __func__);
+				printk(KERN_INFO "[TP] %s: Touch Calibration Confirmed, rezero\n", __func__);
 			}
 #endif
 			if (ts->large_obj_check) {
@@ -2243,47 +2243,37 @@ static int psensor_tp_status_handler_func(struct notifier_block *this,
 	int ret;
 
 	printk(KERN_INFO "[TP] psensor status %d -> %lu\n",
-		ts->psensor_status, status);
+	ts->psensor_status, status);
 
-	if (ts->packrat_number < SYNAPTICS_FW_NOCAL_PACKRAT) {
-		if(ts->psensor_detection) {
-			if(status == 3 && ts->psensor_resume_enable >= 1) {
-				if(!(ts->psensor_status==1 && ts->psensor_resume_enable==1)) {
-					ret = i2c_syn_write_byte_data(ts->client, get_address_base(ts, 0x11, COMMAND_BASE), 0x01);
-					if (ret < 0)
-						i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "w:Rezero_1", __func__);
-					printk(KERN_INFO "[TP] %s: Touch Calibration Confirmed, rezero\n", __func__);
-				}
-
-				if(ts->psensor_resume_enable == 1)
-					queue_work(ts->syn_psensor_wq, &ts->psensor_work);
-				else
-					ts->psensor_resume_enable = 0;
+	if(ts->psensor_detection) {
+		if(status == 3 && ts->psensor_resume_enable >= 1) {
+			if(!(ts->psensor_status==1 && ts->psensor_resume_enable==1)) {
+				ret = i2c_syn_write_byte_data(ts->client, get_address_base(ts, 0x11, COMMAND_BASE), 0x01);
+				if (ret < 0)
+					i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "w:Rezero_1", __func__);
+				printk(KERN_INFO "[TP] %s: Touch Calibration Confirmed, rezero\n", __func__);
 			}
-		}
 
-		if (ts->psensor_status == 0) {
-			if (status == 1)
-				ts->psensor_status = status;
+			if(ts->psensor_resume_enable == 1)
+				queue_work(ts->syn_psensor_wq, &ts->psensor_work);
 			else
-				ts->psensor_status = 0;
-		} else
-			ts->psensor_status = status;
-
-		if(ts->psensor_detection) {
-			if(ts->psensor_status == 0) {
 				ts->psensor_resume_enable = 0;
-				ts->psensor_phone_enable = 0;
-			}
 		}
-	} else {
-		if (ts->psensor_status == 0) {
-			if (status == 1)
-				ts->psensor_status = status;
-			else
-				ts->psensor_status = 0;
-		} else
+	}
+
+	if (ts->psensor_status == 0) {
+		if (status == 1)
 			ts->psensor_status = status;
+		else
+			ts->psensor_status = 0;
+	} else
+		ts->psensor_status = status;
+
+	if(ts->psensor_detection) {
+		if(ts->psensor_status == 0) {
+			ts->psensor_resume_enable = 0;
+			ts->psensor_phone_enable = 0;
+		}
 	}
 
 	return NOTIFY_OK;
@@ -2965,7 +2955,7 @@ static int synaptics_ts_remove(struct i2c_client *client)
 
 static int synaptics_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 {
-	int ret;
+	int ret = 0;
 	struct synaptics_ts_data *ts = i2c_get_clientdata(client);
 	printk(KERN_INFO "[TP] %s: enter\n", __func__);
 
@@ -2977,19 +2967,18 @@ static int synaptics_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 		ret = cancel_work_sync(&ts->work);
 	}
 
-	if (ts->packrat_number < SYNAPTICS_FW_NOCAL_PACKRAT) {
-		if(ts->psensor_detection) {
-			if(ts->psensor_resume_enable == 1){
-				printk(KERN_INFO "[TP] %s: Disable P-sensor by Touch\n", __func__);
-				psensor_enable_by_touch_driver(0);
-				ts->psensor_resume_enable = 0;
-			}
+	if(ts->psensor_detection) {
+		if(ts->psensor_resume_enable == 1){
+			printk(KERN_INFO "[TP] %s: Disable P-sensor by Touch\n", __func__);
+			psensor_enable_by_touch_driver(0);
+			ts->psensor_resume_enable = 0;
 		}
+	}
 
-		if (ts->psensor_status == 0) {
-			ts->pre_finger_data[0][0] = 0;
+	if (ts->psensor_status == 0) {
+		ts->pre_finger_data[0][0] = 0;
+		if (ts->packrat_number < SYNAPTICS_FW_NOCAL_PACKRAT) {
 			ts->first_pressed = 0;
-
 #ifdef SYN_CALIBRATION_CONTROL
 			if (ts->mfg_flag != 1) {
 				ret = i2c_syn_write_byte_data(ts->client,
@@ -3064,9 +3053,8 @@ static int synaptics_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 				printk(KERN_INFO "[TP] touch suspend, set Z Touch threshold: %x\n", ts->threshold_bef_unlock);
 			}
 		}
-		else if(ts->psensor_detection)
-			ts->psensor_phone_enable = 1;
-	}
+	} else if(ts->psensor_detection)
+		ts->psensor_phone_enable = 1;
 
 #ifdef SYN_SUSPEND_RESUME_POWEROFF
 	if (ts->power)
@@ -3133,17 +3121,15 @@ static int synaptics_ts_resume(struct i2c_client *client)
 		input_report_abs(ts->input_dev, ABS_MT_AMPLITUDE, 0);
 		input_report_abs(ts->input_dev, ABS_MT_POSITION, 1 << 31);
 	}
-	if (ts->packrat_number < SYNAPTICS_FW_NOCAL_PACKRAT) {
-		if(ts->psensor_detection) {
-			if(ts->psensor_status == 0) {
-				ts->psensor_resume_enable = 1;
-				printk(KERN_INFO "[TP] %s: Enable P-sensor by Touch\n", __func__);
-				psensor_enable_by_touch_driver(1);
-			} else if(ts->psensor_phone_enable == 0 ) {
-				if(ts->psensor_status != 3)
-					ts->psensor_resume_enable = 2;
-				ts->psensor_phone_enable = 1;
-			}
+	if(ts->psensor_detection) {
+		if(ts->psensor_status == 0) {
+			ts->psensor_resume_enable = 1;
+			printk(KERN_INFO "[TP] %s: Enable P-sensor by Touch\n", __func__);
+			psensor_enable_by_touch_driver(1);
+		} else if(ts->psensor_phone_enable == 0 ) {
+			if(ts->psensor_status != 3)
+				ts->psensor_resume_enable = 2;
+			ts->psensor_phone_enable = 1;
 		}
 	}
 

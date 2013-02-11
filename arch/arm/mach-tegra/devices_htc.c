@@ -39,6 +39,7 @@
 #include <linux/proc_fs.h>
 #include <linux/reboot.h>
 #include <linux/cpu.h>
+#include <linux/sched.h>
 
 #include <mach/dma.h>
 #include <mach/board_htc.h>
@@ -1002,10 +1003,20 @@ static int reboot_callback(struct notifier_block *nb,
 	/*
 	 * NOTE: data is NULL when reboot w/o command or shutdown
 	 */
+	struct task_struct* t;
 	char* cmd;
 
 	cmd = (char*) (data ? data : "");
-	pr_debug("restart command: %s\n", data ? cmd : "<null>");
+	pr_info("kernel_restart(cmd=%s) - triggered with task: %s (%d:%d)\n",
+			data ? data : "<null>",
+			current->comm, current->tgid, current->pid);
+	pr_info("parents of %s:\n", current->comm);
+	t = current->parent;
+	do {
+		pr_info("    %s (%d:%d)\n", t->comm, t->tgid, t->pid);
+		t = t->parent;
+	} while (t->parent != t);
+	dump_stack();
 
 	switch (event)
 	{
