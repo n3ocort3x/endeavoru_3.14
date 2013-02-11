@@ -35,7 +35,7 @@
 #define LOG_TAG "AUD"
 
 #undef AUDIO_DEBUG
-#define AUDIO_DEBUG 1
+#define AUDIO_DEBUG 0
 
 #define AUD_ERR(fmt, ...) pr_tag_err(LOG_TAG, fmt, ##__VA_ARGS__)
 #define AUD_INFO(fmt, ...) pr_tag_info(LOG_TAG, fmt, ##__VA_ARGS__)
