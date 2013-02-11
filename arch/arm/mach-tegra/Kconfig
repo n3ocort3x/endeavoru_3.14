@@ -309,9 +309,11 @@ choice
 
 config TEGRA_CPU_AP33
        bool "AP33/1.5GHz"
+       depends on MACH_ENDEAVORU || MACH_ENDEAVORTD
 
 config TEGRA_CPU_AP37
        bool "AP37/1.7GHz"
+       depends on MACH_ENRC2B || MACH_ENRC2U || MACH_EVITAREUL
 
 endchoice
 
