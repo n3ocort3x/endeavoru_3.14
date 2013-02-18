@@ -544,14 +544,7 @@ int tegra_update_cpu_speed(unsigned long rate)
 	freqs.old = tegra_getspeed(0);
 	freqs.new = rate;
 
-	rate = clk_round_rate(cpu_clk, rate * 1000);
-	if (!IS_ERR_VALUE(rate))
-		freqs.new = rate / 1000;
-
-	if (freqs.old == freqs.new)
-		return ret;
-
-	if (freqs.new < rate_save && rate_save >= 880000) {
+	if (rate_save > 475000) {
 		if (is_lp_cluster()) {
 			orig_nice = task_nice(current);
 
@@ -578,6 +571,10 @@ int tegra_update_cpu_speed(unsigned long rate)
 			 */
 			freqs.new = rate_save;
 		}
+	}
+
+		if (freqs.old == freqs.new){
+		return ret;
 	}
 
 	/*
