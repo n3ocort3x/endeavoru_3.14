@@ -98,7 +98,12 @@ struct switch_dev compositesdev = {
 	.print_state = print_switch_state,
 };
 static	char *envp[3] = {"SWITCH_NAME=htcctusbcmd",
-			"SWITCH_STATE=Capture", 0};
+			"SWITCH_STATE=Capture", 0};#ifdef YES_WE_WANT_THE_OS_TYPE_CHECK	123
+			                /* Both board_mfg_mode() and usb_autobot_mode() return 0 if the	124
+			                   device is booted normally.	125
+			                   This check will cause a different USB interface to be set for	126
+			                   Linux which is not wanted. Disable it to get UMS back.	127
+			                */
 
 static struct work_struct cdusbcmdwork;
 static void ctusbcmd_do_work(struct work_struct *w)
@@ -120,9 +125,16 @@ static void composite_request_reset(struct work_struct *w)
 		if (usb_autobot_mode() || board_mfg_mode()) return;
 
 		INFO(cdev, "%s\n", __func__);
+#ifdef YES_WE_WANT_THE_OS_TYPE_CHECK	123
+		/* Both board_mfg_mode() and usb_autobot_mode() return 0 if the	124
+		device is booted normally.	125
+		This check will cause a different USB interface to be set for	126
+		Linux which is not wanted. Disable it to get UMS back.	127
+		*/
 		if (os_type == OS_LINUX)
 			fsg_update_mode(1);
 		else
+#endif
 			fsg_update_mode(0);
 		composite_disconnect(cdev->gadget);
 		usb_composite_force_reset(cdev);
