@@ -514,3 +514,4 @@ module_exit(tfa9887_exit);
 MODULE_DESCRIPTION("tfa9887 Speaker Amp driver");
 MODULE_LICENSE("GPL");
 
+
