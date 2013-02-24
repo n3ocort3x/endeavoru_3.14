@@ -230,16 +230,16 @@ struct pe_tbl {
         .lv_link = { .prev = _POWER_ENTRY(1200), .next = _POWER_ENTRY(1400) },
         .pwrref = { 323, 506, 726, 1017 }
     },
-    [__SPEED_1400_MHZ__] =
+    [__SPEED_1450_MHZ__] =
     {
-        .speed = 1400000,
-        .lv_link = { .prev = _POWER_ENTRY(1300), .next = _POWER_ENTRY(1500) },
+        .speed = 1450000,
+        .lv_link = { .prev = _POWER_ENTRY(1300), .next = _POWER_ENTRY(1600) },
         .pwrref = { 365, 591, 909, 1323 }
     },
-    [__SPEED_1500_MHZ__] =
+    [__SPEED_1600_MHZ__] =
     {
-        .speed = 1500000,
-        .lv_link = { .prev = _POWER_ENTRY(1400), .next = NULL },
+        .speed = 1600000,
+        .lv_link = { .prev = _POWER_ENTRY(1450), .next = NULL },
         .pwrref = { 398, P(NOT_USED), P(NOT_USED), P(NOT_USED) }
     },
 
@@ -292,28 +292,28 @@ struct pe_tbl {
         .lv_link = { .prev = _POWER_ENTRY(1150), .next = _POWER_ENTRY(1400) },
         .pwrref = { 282, 431, 601, 795 }
     },
-    [__SPEED_1400_MHZ__] =
+    [__SPEED_1450_MHZ__] =
     {
-        .speed = 1400000,
-        .lv_link = { .prev = _POWER_ENTRY(1300), .next = _POWER_ENTRY(1500) },
+        .speed = 1450000,
+        .lv_link = { .prev = _POWER_ENTRY(1300), .next = _POWER_ENTRY(1600) },
         .pwrref = { 334, 524, 746, 1036 }
-    },
-    [__SPEED_1500_MHZ__] =
-    {
-        .speed = 1500000,
-        .lv_link = { .prev = _POWER_ENTRY(1400), .next = _POWER_ENTRY(1600) },
-        .pwrref = { 368, 593, 873, 1198 }
     },
     [__SPEED_1600_MHZ__] =
     {
         .speed = 1600000,
-        .lv_link = { .prev = _POWER_ENTRY(1500), .next = _POWER_ENTRY(1700) },
+        .lv_link = { .prev = _POWER_ENTRY(1450), .next = _POWER_ENTRY(1650) },
+        .pwrref = { 368, 593, 873, 1198 }
+    },
+    [__SPEED_1650_MHZ__] =
+    {
+        .speed = 1650000,
+        .lv_link = { .prev = _POWER_ENTRY(1600), .next = _POWER_ENTRY(1700) },
         .pwrref = { 458, 793, 1185, 1688 }
     },
     [__SPEED_1700_MHZ__] =
     {
         .speed = 1700000,
-        .lv_link = { .prev = _POWER_ENTRY(1600), .next = NULL },
+        .lv_link = { .prev = _POWER_ENTRY(1650), .next = NULL },
         .pwrref = { 467, P(NOT_USED), P(NOT_USED), P(NOT_USED) }
     },
 #endif
