@@ -289,7 +289,7 @@ static struct resource endeavor_disp2_resources[] = {
 };
 
 static struct tegra_dc_sd_settings endeavor_sd_settings = {
-	.enable = 1, /* Normal mode operation */
+	.enable = 0, /* disable it by default, if someone wants to enable: echo "1" > /sys/devices/tegradc.0/smartdimmer/enable */
 	.use_auto_pwm = false,
 	.hw_update_delay = 0,
 	.bin_width = -1,
