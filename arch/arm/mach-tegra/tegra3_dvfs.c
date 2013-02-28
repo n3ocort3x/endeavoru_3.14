@@ -101,13 +101,13 @@ static int tegra3_get_core_floor_mv(int cpu_mv)
 	BUG();
 }
 
-/* vdd_core must be >= min_level as a function of vdd_cpu 
+ /*vdd_core must be >= min_level as a function of vdd_cpu */
 static int tegra3_dvfs_rel_vdd_cpu_vdd_core(struct dvfs_rail *vdd_cpu,
 	struct dvfs_rail *vdd_core)
 {
 	int core_floor = max(vdd_cpu->new_millivolts, vdd_cpu->millivolts);
 	core_floor = tegra3_get_core_floor_mv(core_floor);
-	return max(vdd_core->new_millivolts, core_floor);*/
+	return max(vdd_core->new_millivolts, core_floor);
 }
 
 /* vdd_cpu must be >= (vdd_core - cpu_below_core) */
@@ -124,7 +124,7 @@ static int tegra3_dvfs_rel_vdd_core_vdd_cpu(struct dvfs_rail *vdd_core,
 	return max(vdd_cpu->new_millivolts, cpu_floor);
 }
 
-/*static struct dvfs_relationship tegra3_dvfs_relationships[] = {
+static struct dvfs_relationship tegra3_dvfs_relationships[] = {
 	{
 		.from = &tegra3_dvfs_rail_vdd_cpu,
 		.to = &tegra3_dvfs_rail_vdd_core,
@@ -136,7 +136,7 @@ static int tegra3_dvfs_rel_vdd_core_vdd_cpu(struct dvfs_rail *vdd_core,
 		.to = &tegra3_dvfs_rail_vdd_cpu,
 		.solve = tegra3_dvfs_rel_vdd_core_vdd_cpu,
 	},
-};*/
+};
 
 #define CPU_DVFS(_clk_name, _speedo_id, _process_id, _mult, _freqs...)	\
 	{								\
