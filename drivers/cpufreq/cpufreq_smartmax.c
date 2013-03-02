@@ -70,13 +70,13 @@ static unsigned int ramp_down_step;
 /*
  * CPU freq will be increased if measured load > max_cpu_load;
  */
-#define DEFAULT_MAX_CPU_LOAD 80
+#define DEFAULT_MAX_CPU_LOAD 65
 static unsigned int max_cpu_load;
 
 /*
  * CPU freq will be decreased if measured load < min_cpu_load;
  */
-#define DEFAULT_MIN_CPU_LOAD 45
+#define DEFAULT_MIN_CPU_LOAD 35
 static unsigned int min_cpu_load;
 
 /*
@@ -99,12 +99,12 @@ static unsigned int sampling_rate;
 #define DEFAULT_INPUT_BOOST_DURATION 50000000
 static unsigned int input_boost_duration;
 
-static unsigned int touch_poke_freq = 1300000;
+static unsigned int touch_poke_freq = 1000000;
 static bool touch_poke = true;
 
 static bool sync_cpu_downscale = false;
 
-static unsigned int boost_freq = 1300000;
+static unsigned int boost_freq = 1000000;
 static bool boost = true;
 static unsigned int boost_duration = 0;
 
