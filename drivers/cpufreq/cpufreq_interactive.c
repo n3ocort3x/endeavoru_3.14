@@ -65,28 +65,32 @@ static spinlock_t down_cpumask_lock;
 static struct mutex set_speed_lock;
 
 /* Go to max speed when CPU load at or above this value. */
-#define DEFAULT_GO_MAXSPEED_LOAD 85
+#define DEFAULT_GO_MAXSPEED_LOAD 90
 static unsigned long go_maxspeed_load;
 
 /* Base of exponential raise to max speed; if 0 - jump to maximum */
+#define DEFAULT_BOOST_FACTOR 0
 static unsigned long boost_factor;
 
 /* Max frequency boost in Hz; if 0 - no max is enforced */
+#define DEFAULT_MAX_BOOST 0
 static unsigned long max_boost;
 
 /* Consider IO as busy */
+#define DEFAULT_IO_IS_BUSY 0
 static unsigned long io_is_busy;
 
 /*
  * Targeted sustainable load relatively to current frequency.
  * If 0, target is set realtively to the max speed
  */
+#define DEFAULT_SUSTAIN_LOAD 80
 static unsigned long sustain_load;
 
 /*
  * The minimum amount of time to spend at a frequency before we can ramp down.
  */
-#define DEFAULT_MIN_SAMPLE_TIME 80000;
+#define DEFAULT_MIN_SAMPLE_TIME 30000;
 static unsigned long min_sample_time;
 
 /*
@@ -102,7 +106,7 @@ static unsigned long timer_rate;
  * becomes the best way to enforce a square wave.
  * e.g. 5*MIN_SAMPLE_TIME = 20% high freq duty cycle
  */
-#define DEFAULT_HIGH_FREQ_MIN_DELAY 5*DEFAULT_MIN_SAMPLE_TIME
+#define DEFAULT_HIGH_FREQ_MIN_DELAY 0
 static unsigned long high_freq_min_delay;
 
 /*
@@ -458,6 +462,8 @@ static void cpufreq_interactive_idle_start(void)
 		&per_cpu(cpuinfo, smp_processor_id());
 	int pending;
 
+	BUG_ON(pcpu == NULL);
+
 	if (!pcpu->governor_enabled)
 		return;
 
@@ -510,6 +516,8 @@ static void cpufreq_interactive_idle_end(void)
 {
 	struct cpufreq_interactive_cpuinfo *pcpu =
 		&per_cpu(cpuinfo, smp_processor_id());
+
+	BUG_ON(pcpu == NULL);
 
 	pcpu->idling = 0;
 	smp_wmb();
@@ -749,10 +757,10 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		if (atomic_inc_return(&active_count) > 1)
 			return 0;
 
-		rc = sysfs_create_group(cpufreq_global_kobject,
+		/*rc = sysfs_create_group(cpufreq_global_kobject,
 				&interactive_attr_group);
 		if (rc)
-			return rc;
+			return rc;*/
 
 		if (!policy->cpu)
 			rc = input_register_handler(&dbs_input_handler);
@@ -782,8 +790,8 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		if (atomic_dec_return(&active_count) > 0)
 			return 0;
 
-		sysfs_remove_group(cpufreq_global_kobject,
-				&interactive_attr_group);
+		/*sysfs_remove_group(cpufreq_global_kobject,
+				&interactive_attr_group);*/
 
 		break;
 
@@ -830,6 +838,10 @@ static int __init cpufreq_interactive_init(void)
 	timer_rate = DEFAULT_TIMER_RATE;
 	high_freq_min_delay = DEFAULT_HIGH_FREQ_MIN_DELAY;
 	max_normal_freq = DEFAULT_MAX_NORMAL_FREQ;
+	boost_factor=DEFAULT_BOOST_FACTOR;
+	max_boost=DEFAULT_MAX_BOOST;
+	io_is_busy=DEFAULT_IO_IS_BUSY;
+	sustain_load=DEFAULT_SUSTAIN_LOAD;
 
 	/* Initalize per-cpu timers */
 	for_each_possible_cpu(i) {
@@ -890,3 +902,4 @@ MODULE_AUTHOR("Mike Chan <mike@android.com>");
 MODULE_DESCRIPTION("'cpufreq_interactive' - A cpufreq governor for "
 	"Latency sensitive workloads");
 MODULE_LICENSE("GPL");
+
