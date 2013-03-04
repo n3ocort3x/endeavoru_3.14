@@ -33,6 +33,8 @@
 
 #include <trace/events/power.h>
 
+static DEFINE_MUTEX(dvfs_lock);
+
 /**
  * The "cpufreq driver" - the arch- or hardware-dependent low
  * level driver of CPUFreq support, and its spinlock. This lock
@@ -129,7 +131,7 @@ pure_initcall(init_cpufreq_transition_notifier_list);
 
 static LIST_HEAD(cpufreq_governor_list);
 static DEFINE_MUTEX(cpufreq_governor_mutex);
-
+	
 static struct cpufreq_policy *__cpufreq_cpu_get(unsigned int cpu, bool sysfs)
 {
 	struct cpufreq_policy *data;
@@ -435,7 +437,9 @@ static ssize_t store_##file_name					\
 }
 
 store_one(scaling_min_freq, min);
+#ifndef CONFIG_HOTPLUG_CPU
 store_one(scaling_max_freq, max);
+#endif
 
 /**
  * show_cpuinfo_cur_freq - current CPU frequency as detected by hardware
@@ -475,14 +479,45 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 	unsigned int ret = -EINVAL;
 	char	str_governor[16];
 	struct cpufreq_policy new_policy;
-
-	ret = cpufreq_get_policy(&new_policy, policy->cpu);
-	if (ret)
-		return ret;
+#ifdef CONFIG_HOTPLUG_CPU
+	int cpu;
+#endif
 
 	ret = sscanf(buf, "%15s", str_governor);
 	if (ret != 1)
 		return -EINVAL;
+
+	// maxwen: try to set govenor to all online cpus
+	// else govvener will be set when cpu comes online the next time
+#ifdef CONFIG_HOTPLUG_CPU
+	for_each_present_cpu(cpu) {
+		ret = cpufreq_get_policy(&new_policy, cpu);
+		if (ret){
+			continue;
+		}
+		
+		if (cpufreq_parse_governor(str_governor, &new_policy.policy,
+						&new_policy.governor)){
+
+			continue;
+		}
+
+		/* Do not use cpufreq_set_policy here or the user_policy.max
+	   	will be wrongly overridden */
+		ret = __cpufreq_set_policy(policy, &new_policy);
+
+		policy->user_policy.policy = policy->policy;
+		policy->user_policy.governor = policy->governor;
+		
+		if (ret){
+			continue;
+		}
+		printk(KERN_ERR "maxwen:setting govenor %s on cpu %d ok\n", str_governor, cpu);
+	}
+#else 
+	ret = cpufreq_get_policy(&new_policy, policy->cpu);
+	if (ret)
+		return ret;
 
 	if (cpufreq_parse_governor(str_governor, &new_policy.policy,
 						&new_policy.governor))
@@ -497,8 +532,9 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 
 	if (ret)
 		return ret;
-	else
-		return count;
+#endif
+
+	return count;	
 }
 
 /**
@@ -610,11 +646,112 @@ static ssize_t show_bios_limit(struct cpufreq_policy *policy, char *buf)
 	return sprintf(buf, "%u\n", policy->cpuinfo.max_freq);
 }
 
+static ssize_t store_scaling_max_freq_limit(struct cpufreq_policy *policy,
+					const char *buf, size_t count)
+{
+	unsigned int ret = -EINVAL;		
+	unsigned int cpu;			
+	struct cpufreq_policy new_policy;				
+	int max = 0;
+	
+	ret = sscanf(buf, "%u,%u,%u,%u", &tegra_pmqos_cpu_freq_limits[0], &tegra_pmqos_cpu_freq_limits[1],
+		&tegra_pmqos_cpu_freq_limits[2], &tegra_pmqos_cpu_freq_limits[3]);
+		
+	if (ret < 4)
+		return -EINVAL;
+
+	// maxwen: apply new policy->max to all online cpus
+	// all non-online will get correct policy->max when they become
+	// online again in cpu-tegra.c:tegra_cpu_init
+#ifdef CONFIG_HOTPLUG_CPU
+	for_each_online_cpu(cpu) {
+		policy = cpufreq_cpu_get(cpu);
+		if (!policy)
+			continue;
+		
+		ret = cpufreq_get_policy(&new_policy, cpu);
+		if (ret)							
+			continue;
+
+		BUG_ON(cpu > 3);
+		max = tegra_pmqos_cpu_freq_limits[cpu];
+		if (max == 0)
+			// valus = 0 means reset to default
+			max = tegra_pmqos_boost_freq;						
+		
+		new_policy.max = max;
+		ret = __cpufreq_set_policy(policy, &new_policy);
+		policy->user_policy.max = new_policy.max;
+		if (!ret)
+			pr_info("maxwen:store_scaling_max_freq_limit set policy->max of cpu %d to %d - ok\n", cpu, new_policy.max);
+		
+		cpufreq_cpu_put(policy);
+	}
+#endif
+	return count;
+}
+
+#ifdef CONFIG_HOTPLUG_CPU
+static ssize_t store_scaling_max_freq(struct cpufreq_policy *policy,
+					const char *buf, size_t count)
+{
+	unsigned int ret = -EINVAL;		
+	unsigned int cpu;			
+	struct cpufreq_policy new_policy;				
+	int max = 0;
+	unsigned int max_freq;
+	
+	ret = sscanf(buf, "%u", &max_freq);
+		
+	if (ret != 1)
+		return -EINVAL;
+
+	if (max_freq != 0 && max_freq < T3_LP_MAX_FREQ)
+		return -EINVAL;
+
+	// maxwen: this will overwrite any values set by
+	// scaling_max_freq_limit
+	tegra_pmqos_cpu_freq_limits[0]=max_freq;
+	tegra_pmqos_cpu_freq_limits[1]=max_freq;
+	tegra_pmqos_cpu_freq_limits[2]=max_freq;
+	tegra_pmqos_cpu_freq_limits[3]=max_freq;
+				
+	// maxwen: apply new policy->max to all online cpus
+	// all non-online will get correct policy->max when they become
+	// online again in cpu-tegra.c:tegra_cpu_init
+	for_each_online_cpu(cpu) {
+		policy = cpufreq_cpu_get(cpu);
+		if (!policy)
+			continue;
+	
+		ret = cpufreq_get_policy(&new_policy, cpu);
+		if (ret)							
+			continue;					
+		
+		BUG_ON(cpu > 3);
+		max = tegra_pmqos_cpu_freq_limits[cpu];
+		if (max == 0)
+			// valus = 0 means reset to default
+			max = tegra_pmqos_boost_freq;						
+
+		new_policy.max = max;
+		ret = __cpufreq_set_policy(policy, &new_policy);
+		policy->user_policy.max = new_policy.max;
+		if (!ret)
+			pr_info("maxwen:store_scaling_max_freq set policy->max of cpu %d to %d - ok\n", cpu, new_policy.max);
+		
+		cpufreq_cpu_put(policy);
+	}
+	return count;
+}
+#endif
+
+
 #ifdef CONFIG_VOLTAGE_CONTROL
 /*
- * Tegra3 voltage control via cpufreq by Paul Reioux (faux123)
- * inspired by Michael Huang's voltage control code for OMAP44xx
- */
+* Tegra3 voltage control via cpufreq by Paul Reioux (faux123)
+* inspired by Michael Huang's voltage control code for OMAP44xx
+*/
 
 #include "../../arch/arm/mach-tegra/dvfs.h"
 #include "../../arch/arm/mach-tegra/clock.h"
@@ -631,48 +768,130 @@ static ssize_t show_UV_mV_table(struct cpufreq_policy *policy, char *buf)
 	i = cpu_clk_g->dvfs->num_freqs;
 
 	for(i--; i >=0; i--) {
-		out += sprintf(out, "%lumhz: %i mV\n",
-				cpu_clk_g->dvfs->freqs[i]/1000000,
-				cpu_clk_g->dvfs->millivolts[i]);
-	}
-
-	return out - buf;
+	out += sprintf(out, "%lumhz: %i mV\n",
+	cpu_clk_g->dvfs->freqs[i]/1000000,
+	cpu_clk_g->dvfs->millivolts[i]);
 }
 
-static ssize_t store_UV_mV_table(struct cpufreq_policy *policy, const char *buf, size_t count)
+return out - buf;
+}
+
+static ssize_t store_UV_mV_table(struct cpufreq_policy *policy, char *buf, size_t count)
 {
 	int i = 0;
 	unsigned long volt_cur;
 	int ret;
 	char size_cur[16];
 
-	struct clk *cpu_clk_g = tegra_get_clock_by_name("cpu_g");
+struct clk *cpu_clk_g = tegra_get_clock_by_name("cpu_g");
 
 	/* find how many actual entries there are */
 	i = cpu_clk_g->dvfs->num_freqs;
 
 	for(i--; i >= 0; i--) {
 
-		if(cpu_clk_g->dvfs->freqs[i]/1000000 != 0) {
-			ret = sscanf(buf, "%lu", &volt_cur);
-			if (ret != 1)
-				return -EINVAL;
+	if(cpu_clk_g->dvfs->freqs[i]/1000000 != 0) {
+	ret = sscanf(buf, "%lu", &volt_cur);
+	if (ret != 1)
+	return -EINVAL;
 
-			/* TODO: need some robustness checks */
-			user_mv_table[i] = volt_cur;
-			pr_info("user mv tbl[%i]: %lu\n", i, volt_cur);
+	/* TODO: need some robustness checks */
+	user_mv_table[i] = volt_cur;
+	pr_info("user mv tbl[%i]: %lu\n", i, volt_cur);
 
-			/* Non-standard sysfs interface: advance buf */
-			ret = sscanf(buf, "%s", size_cur);
-			buf += (strlen(size_cur)+1);
-		}
+	/* Non-standard sysfs interface: advance buf */
+	ret = sscanf(buf, "%s", size_cur);
+	buf += (strlen(size_cur)+1);
 	}
+}
 	/* update dvfs table here */
 	cpu_clk_g->dvfs->millivolts = user_mv_table;
 
 	return count;
 }
 #endif
+
+static ssize_t show_gpu_oc(struct cpufreq_policy *policy, char *buf)
+{
+	char *c = buf;
+	struct clk *gpu = tegra_get_clock_by_name("3d");
+	int i = gpu->dvfs->num_freqs;
+
+	if (i == 0)
+		return -EINVAL;
+
+	for (i--; i >= 1; i--)
+		c += sprintf(c, "%lu ", gpu->dvfs->freqs[i]/1000000);
+
+	return c - buf;
+}
+
+static ssize_t store_gpu_oc(struct cpufreq_policy *policy, const char *buf, size_t count)
+{
+	int ret;
+	unsigned long gpu_freq;
+
+	//all the tables that need to be updated with the new frequencies
+	struct clk *vde = tegra_get_clock_by_name("vde");
+	struct clk *mpe = tegra_get_clock_by_name("mpe");
+	struct clk *two_d = tegra_get_clock_by_name("2d");
+	struct clk *epp = tegra_get_clock_by_name("epp");
+	struct clk *three_d = tegra_get_clock_by_name("3d");
+	struct clk *three_d2 = tegra_get_clock_by_name("3d2");
+	struct clk *se = tegra_get_clock_by_name("se");
+	struct clk *host1x = tegra_get_clock_by_name("host1x");
+	struct clk *cbus = tegra_get_clock_by_name("cbus");
+	struct clk *pll_c = tegra_get_clock_by_name("pll_c");
+
+	const int array_size = vde->dvfs->num_freqs;
+	char cur_size[array_size];
+	int i = array_size;
+
+	if (i == 0) 
+		return -EINVAL;
+
+	for (i--; i >= 1; i--) {
+		ret = sscanf(buf, "%lu", &gpu_freq);
+
+		mutex_lock(&dvfs_lock);
+		if (i == array_size-1) {
+			vde->max_rate = gpu_freq*1000000;
+			mpe->max_rate = gpu_freq*1000000;
+			two_d->max_rate = gpu_freq*1000000;
+			epp->max_rate = gpu_freq*1000000;
+			three_d->max_rate = gpu_freq*1000000;
+			three_d2->max_rate = gpu_freq*1000000;
+			se->max_rate = gpu_freq*1000000;
+			host1x->max_rate = DIV_ROUND_UP((gpu_freq*1000000),2);
+			cbus->max_rate = gpu_freq*1000000;
+			pll_c->max_rate = (gpu_freq*1000000)*2;
+			pr_info("Set clk->max_rate. %d\n", i);
+		}
+
+		vde->dvfs->freqs[i] = gpu_freq*1000000;
+		mpe->dvfs->freqs[i] = gpu_freq*1000000;
+		two_d->dvfs->freqs[i] = gpu_freq*1000000;
+		epp->dvfs->freqs[i] = gpu_freq*1000000;
+		three_d->dvfs->freqs[i] = gpu_freq*1000000;
+		three_d2->dvfs->freqs[i] = gpu_freq*1000000;
+		se->dvfs->freqs[i] = gpu_freq*1000000;
+		cbus->dvfs->freqs[i] = gpu_freq*1000000;
+		if (i >= 6)
+			pll_c->dvfs->freqs[i] = (gpu_freq*1000000)*2;
+			
+		mutex_unlock(&dvfs_lock);
+
+		ret = sscanf(buf, "%s", cur_size);
+
+		if (ret == 0)
+			return 0;
+
+		buf += (strlen(cur_size) + 1);
+	}
+
+	return count;
+}
+
 
 cpufreq_freq_attr_ro_perm(cpuinfo_cur_freq, 0400);
 cpufreq_freq_attr_ro(cpuinfo_min_freq);
@@ -686,13 +905,15 @@ cpufreq_freq_attr_ro(related_cpus);
 cpufreq_freq_attr_ro(affected_cpus);
 cpufreq_freq_attr_rw(scaling_min_freq);
 cpufreq_freq_attr_rw(scaling_max_freq);
+cpufreq_freq_attr_rw(scaling_max_freq_limit);
 cpufreq_freq_attr_rw(scaling_governor);
 cpufreq_freq_attr_rw(scaling_setspeed);
-cpufreq_freq_attr_ro(policy_min_freq);
-cpufreq_freq_attr_ro(policy_max_freq);
 #ifdef CONFIG_VOLTAGE_CONTROL
 cpufreq_freq_attr_rw(UV_mV_table);
 #endif
+cpufreq_freq_attr_rw(gpu_oc);
+cpufreq_freq_attr_ro(policy_min_freq);
+cpufreq_freq_attr_ro(policy_max_freq);
 
 static struct attribute *default_attrs[] = {
 	&cpuinfo_min_freq.attr,
@@ -700,17 +921,19 @@ static struct attribute *default_attrs[] = {
 	&cpuinfo_transition_latency.attr,
 	&scaling_min_freq.attr,
 	&scaling_max_freq.attr,
+	&scaling_max_freq_limit.attr,
 	&affected_cpus.attr,
 	&related_cpus.attr,
 	&scaling_governor.attr,
 	&scaling_driver.attr,
 	&scaling_available_governors.attr,
 	&scaling_setspeed.attr,
+#ifdef CONFIG_VOLTAGE_CONTROL
+&UV_mV_table.attr,
+#endif
+	&gpu_oc.attr,
 	&policy_min_freq.attr,
 	&policy_max_freq.attr,
-#ifdef CONFIG_VOLTAGE_CONTROL
-	&UV_mV_table.attr,
-#endif
 	NULL
 };
 
@@ -801,6 +1024,11 @@ static int cpufreq_add_dev_policy(unsigned int cpu,
 #ifdef CONFIG_SMP
 	unsigned long flags;
 	unsigned int j;
+	
+	// maxwen: we have already set the policy that we
+	// want to use in cpufreq_add_dev
+	// this makes sure that al cpus use the same governor
+#if 0
 #ifdef CONFIG_HOTPLUG_CPU
 	struct cpufreq_governor *gov;
 
@@ -810,6 +1038,7 @@ static int cpufreq_add_dev_policy(unsigned int cpu,
 		pr_debug("Restoring governor %s for cpu %d\n",
 		       policy->governor->name, cpu);
 	}
+#endif
 #endif
 
 	for_each_cpu(j, policy->cpus) {
@@ -1046,9 +1275,15 @@ static int cpufreq_add_dev(struct sys_device *sys_dev)
 			break;
 		}
 	}
+		
 #endif
-	if (!found)
+
+	if (!found){
 		policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
+	}
+
+	printk(KERN_ERR "maxwen: set govener for cpu %d to %s\n", cpu, policy->governor->name);	
+	
 	/* call driver. From then on the cpufreq must be able
 	 * to accept all calls to ->verify and ->setpolicy for this CPU
 	 */
@@ -1927,27 +2162,13 @@ int cpufreq_set_gov(char *target_gov, unsigned int cpu)
 	if (!cur_policy)
 		return -EINVAL;
 
-	if (lock_policy_rwsem_read(cur_policy->cpu) < 0) {
-		ret = -EINVAL;
-		goto err_out;
-	}
-
-	if (cur_policy->governor)
-		ret = strncmp(cur_policy->governor->name, target_gov,
-					strlen(target_gov));
-	else {
-		unlock_policy_rwsem_read(cur_policy->cpu);
-		ret = -EINVAL;
-		goto err_out;
-	}
-	unlock_policy_rwsem_read(cur_policy->cpu);
-
-	if (!ret) {
-		pr_debug(" Target governer & current governer is same\n");
+	new_policy = *cur_policy;
+	if (!strncmp(cur_policy->governor->name, target_gov,
+			strlen(target_gov))) {
+		/* Target governer & current governer is same */
 		ret = -EINVAL;
 		goto err_out;
 	} else {
-		new_policy = *cur_policy;
 		if (cpufreq_parse_governor(target_gov, &new_policy.policy,
 				&new_policy.governor)) {
 			ret = -EINVAL;
@@ -2123,7 +2344,7 @@ static int cpu_freq_notify(struct notifier_block *b,
 			   unsigned long l, void *v)
 {
 	int cpu;
-	pr_debug("PM QoS %s %lu\n",
+	pr_info("PM QoS PM_QOS_CPU_FREQ %s %lu\n",
 		b == &min_freq_notifier ? "min" : "max", l);
 	for_each_online_cpu(cpu) {
 		struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
