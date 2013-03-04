@@ -2395,13 +2395,11 @@ static int tegra_udc_start(struct usb_gadget_driver *driver,
 
 
 	/* Enable DR IRQ reg and Set usbcmd reg  Run bit */
-	if (!udc->transceiver) {
-		dr_controller_run(udc);
-		udc->usb_state = USB_STATE_ATTACHED;
-		udc->ep0_state = WAIT_FOR_SETUP;
-		udc->ep0_dir = 0;
-		udc->vbus_active = vbus_enabled(udc);
-	}
+	dr_controller_run(udc);
+	udc->usb_state = USB_STATE_ATTACHED;
+	udc->ep0_state = WAIT_FOR_SETUP;
+	udc->ep0_dir = 0;
+	udc->vbus_active = vbus_enabled(udc);
 
 	USB_INFO("%s: bind to driver %s\n",
 			udc->gadget.name, driver->driver.name);
@@ -2894,12 +2892,6 @@ static int tegra_udc_resume(struct platform_device *pdev)
 
 	DBG("%s(%d) END\n", __func__, __LINE__);
 	return 0;
-}
-
-void tegra_udc_set_phy_clk(bool pull_up)
-{
-	struct tegra_udc *udc = the_udc;
-	tegra_usb_set_usb_clk(udc->phy, pull_up);
 }
 
 

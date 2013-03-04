@@ -345,7 +345,7 @@ static void android_work(struct work_struct *data)
 	if (atomic_read(&connect2pc) != dev->sw_connected) {
 		atomic_set(&connect2pc, dev->sw_connected);
 		switch_set_state(&cdev->sw_connect2pc, atomic_read(&connect2pc) ? 1 : 0);
-		USB_INFO("set usb_connect2pc = %d\n", atomic_read(&connect2pc) ? 1 : 0);
+		USB_INFO("set usb_connect2pc = %d\n", connect2pc);
 		if (!atomic_read(&connect2pc)) {
 			USB_INFO("%s: OS_NOT_YET\n", __func__);
 			os_type = OS_NOT_YET;
@@ -934,7 +934,7 @@ static int mtp_function_init(struct android_usb_function *f, struct usb_composit
 	struct android_dev *dev = _android_dev;
 	int ret;
 	ret = mtp_setup();
-	mtp_setup_perflock();
+	mtp_setup_perflock(dev->pdata->mtp_perf_lock_on?true:false);
 	return ret;
 }
 
@@ -1866,7 +1866,16 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 	int enabled = 0;
 
 	sscanf(buff, "%d", &enabled);
+//++htc++
+	if (enabled) {
+		htc_usb_enable_function("adb", 1);
+		pr_info("%s, buff: %s\n", __func__, buff);
+	}
 
+	/* temporaily return immediately to prevent framework change usb behavior
+	 */
+	return size;
+//--htc--
 	if (enabled && !dev->enabled) {
 		/* update values in composite driver's copy of device descriptor */
 		cdev->desc.idVendor = device_desc.idVendor;
@@ -1875,8 +1884,10 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 		cdev->desc.bDeviceClass = device_desc.bDeviceClass;
 		cdev->desc.bDeviceSubClass = device_desc.bDeviceSubClass;
 		cdev->desc.bDeviceProtocol = device_desc.bDeviceProtocol;
-		usb_add_config(cdev, &android_config_driver,
-					android_bind_config);
+		if (usb_add_config(cdev, &android_config_driver,
+							android_bind_config))
+			return size;//htc
+
 		usb_gadget_connect(cdev->gadget);
 		dev->enabled = true;
 	} else if (!enabled && dev->enabled) {
@@ -2017,8 +2028,9 @@ static ssize_t enable_diag_store(struct device *pdev, struct device_attribute *a
 		cdev->desc.bDeviceClass = device_desc.bDeviceClass;
 		cdev->desc.bDeviceSubClass = device_desc.bDeviceSubClass;
 		cdev->desc.bDeviceProtocol = device_desc.bDeviceProtocol;
-		usb_add_config(cdev, &android_config_driver,
-					android_bind_config);
+		if (usb_add_config(cdev, &android_config_driver, android_bind_config))
+			return size;
+
 		usb_gadget_connect(cdev->gadget);
 		dev->enabled = true;
 	}
@@ -2057,8 +2069,9 @@ static ssize_t enable_diag_mdm_rmnet_store(struct device *pdev, struct device_at
 		cdev->desc.bDeviceClass = device_desc.bDeviceClass;
 		cdev->desc.bDeviceSubClass = device_desc.bDeviceSubClass;
 		cdev->desc.bDeviceProtocol = device_desc.bDeviceProtocol;
-		usb_add_config(cdev, &android_config_driver,
-					android_bind_config);
+		if (usb_add_config(cdev, &android_config_driver, android_bind_config))
+			return size;
+
 		usb_gadget_connect(cdev->gadget);
 		dev->enabled = true;
 	}

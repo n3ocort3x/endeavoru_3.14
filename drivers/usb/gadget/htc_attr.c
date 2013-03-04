@@ -272,7 +272,7 @@ int android_show_function(char *buf)
 	return length;
 }
 
-void tegra_udc_set_phy_clk(bool pull_up);
+
 int android_switch_function(unsigned func)
 {
 	struct android_dev *dev = _android_dev;
@@ -310,11 +310,6 @@ int android_switch_function(unsigned func)
 		pr_debug("%s enter offmode-charging\n", __func__);
 		tegra_otg_set_disable_usb(1);
 	}
-
-	if (func & (1 << USB_FUNCTION_RNDIS))
-		tegra_udc_set_phy_clk(true);
-	else
-		tegra_udc_set_phy_clk(false);
 
 	while ((f = *functions++)) {
 		if ((func & (1 << USB_FUNCTION_UMS)) &&
@@ -807,6 +802,18 @@ static ssize_t show_os_type(struct device *dev,
 	USB_INFO("%s: %s\n", __func__, buf);
 	return length;
 }
+
+/* ats mode */
+static ssize_t show_ats(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	unsigned length;
+
+	length = sprintf(buf, "%d\n", board_get_usb_ats());
+	USB_INFO("%s: %s\n", __func__, buf);
+	return length;
+}
+
 static DEVICE_ATTR(usb_cable_connect, 0444, show_usb_cable_connect, NULL);
 static DEVICE_ATTR(usb_function_switch, 0664,
 		show_usb_function_switch, store_usb_function_switch);
@@ -823,6 +830,7 @@ static DEVICE_ATTR(usb_perflock_setting, 0664,
 static DEVICE_ATTR(usb_disable, 0664,
 		NULL, store_usb_disable_setting);
 static DEVICE_ATTR(os_type, 0444, show_os_type, NULL);
+static DEVICE_ATTR(ats, 0444, show_ats, NULL);
 
 static struct attribute *android_htc_usb_attributes[] = {
 	&dev_attr_usb_cable_connect.attr,
@@ -835,6 +843,7 @@ static struct attribute *android_htc_usb_attributes[] = {
 	&dev_attr_usb_perflock_setting.attr,
 	&dev_attr_usb_disable.attr,
 	&dev_attr_os_type.attr,
+	&dev_attr_ats.attr,
 #if (defined(CONFIG_USB_OTG) && defined(CONFIG_USB_OTG_HOST))
 	&dev_attr_host_mode.attr,
 #endif

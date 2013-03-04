@@ -101,7 +101,11 @@ static void charger_detect(struct tegra_udc *udc)
 		udc->connect_type = CONNECT_TYPE_UNKNOWN;
 		queue_delayed_work(udc->usb_wq, &udc->chg_work,
 			DELAY_FOR_CHECK_CHG);
-		queue_delayed_work(system_nrt_wq, &udc->ac_detect_work, 3 * HZ);
+		if (first_online) {
+			queue_delayed_work(system_nrt_wq, &udc->ac_detect_work, 6 * HZ);
+			first_online = 0;
+		} else
+			queue_delayed_work(system_nrt_wq, &udc->ac_detect_work, 3 * HZ);
 	} else {
 		USB_INFO("Charger :AC [portsc:%x]\n", portsc);
 		udc->connect_type = CONNECT_TYPE_AC;
@@ -199,6 +203,7 @@ static void usb_prepare(struct tegra_udc *udc)
 	wake_lock_init(&udc_resume_wake_lock, WAKE_LOCK_SUSPEND, "usb_udc_resume_lock");
 
 	udc->ac_detect_count = 0;
+	first_online = 1;
 
 #if defined(CONFIG_CABLE_DETECT_ACCESSORY)
 	cable_detect_register_notifier(&cable_status_notifier);
