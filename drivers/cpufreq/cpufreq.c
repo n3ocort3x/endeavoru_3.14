@@ -32,6 +32,8 @@
 #include <linux/pm_qos_params.h>
 
 #include <trace/events/power.h>
+#include "../../arch/arm/mach-tegra/tegra_pmqos.h"
+#include "../../arch/arm/mach-tegra/cpu-tegra.h"
 
 static DEFINE_MUTEX(dvfs_lock);
 
@@ -69,6 +71,7 @@ static DEFINE_SPINLOCK(cpufreq_driver_lock);
  */
 static DEFINE_PER_CPU(int, cpufreq_policy_cpu);
 static DEFINE_PER_CPU(struct rw_semaphore, cpu_policy_rwsem);
+DEFINE_PER_CPU(int, cpufreq_init_done);
 
 #define lock_policy_rwsem(mode, cpu)					\
 int lock_policy_rwsem_##mode						\
@@ -437,7 +440,7 @@ static ssize_t store_##file_name					\
 }
 
 store_one(scaling_min_freq, min);
-store_one(scaling_max_freq, max);
+// store_one(scaling_max_freq, max);
 
 /**
  * show_cpuinfo_cur_freq - current CPU frequency as detected by hardware
@@ -789,6 +792,96 @@ static ssize_t store_gpu_oc(struct cpufreq_policy *policy, const char *buf, size
 	return count;
 }
 
+static ssize_t show_scaling_max_freq_limit(struct cpufreq_policy *policy, char *buf)
+{
+return sprintf(buf, "%u,%u,%u,%u\n", tegra_pmqos_cpu_freq_limits[0], tegra_pmqos_cpu_freq_limits[1],
+tegra_pmqos_cpu_freq_limits[2], tegra_pmqos_cpu_freq_limits[3]);
+}
+
+static ssize_t store_scaling_max_freq_limit(struct cpufreq_policy *policy,
+const char *buf, size_t count)
+{
+if (miss_freq_set > 0) {
+ --miss_freq_set;
+  return -EINVAL;
+}                 
+unsigned int ret = -EINVAL;	
+unsigned int cpu;	
+struct cpufreq_policy new_policy;	
+int max = 0;
+
+ret = sscanf(buf, "%u,%u,%u,%u", &tegra_pmqos_cpu_freq_limits[0], &tegra_pmqos_cpu_freq_limits[1],
+&tegra_pmqos_cpu_freq_limits[2], &tegra_pmqos_cpu_freq_limits[3]);
+
+if (ret < 4)
+return ret;
+
+// maxwen: apply new policy->max to all online cpus
+// all non-online will get correct policy->max when they become
+// online again in cpu-tegra.c:tegra_cpu_init
+#ifdef CONFIG_HOTPLUG_CPU
+for_each_online_cpu(cpu) {
+policy = cpufreq_cpu_get(cpu);
+if (!policy)
+continue;
+
+ret = cpufreq_get_policy(&new_policy, cpu);
+if (ret)	
+continue;
+
+max = tegra_pmqos_cpu_freq_limits[cpu];
+if (max == 0)
+// valus = 0 means reset to default
+max = tegra_pmqos_boost_freq;	
+
+
+new_policy.max = max;
+ret = __cpufreq_set_policy(policy, &new_policy);
+policy->user_policy.max = new_policy.max;
+if (!ret)
+pr_info("maxwen:store_scaling_max_freq_limit set policy->max of cpu %d to %d - ok\n", cpu, new_policy.max);
+
+cpufreq_cpu_put(policy);
+}
+#endif
+return count;
+}
+
+static ssize_t store_scaling_max_freq	
+(struct cpufreq_policy *policy, const char *buf, size_t count)	
+{	
+unsigned int ret = -EINVAL;	
+struct cpufreq_policy new_policy;
+char* temp;	
+
+ret = cpufreq_get_policy(&new_policy, policy->cpu);	
+if (ret)	
+return -EINVAL;	
+
+ret = sscanf(buf, "%u", &new_policy.max);	
+if (ret != 1)	
+return -EINVAL;	
+/*Bricked:*/	
+if (new_policy.max <= 475000)
+                return -EINVAL;
+tegra_pmqos_boost_freq = new_policy.max;
+/*EndBricked*/
+
+ret = __cpufreq_set_policy(policy, &new_policy);	
+policy->user_policy.max = new_policy.max;	
+
+htc_set_cpu_user_cap(new_policy.max);	
+pr_info("Xmister: Set User cap to %u\n", new_policy.max);
+
+temp=kmalloc(sizeof(char)*(strlen(buf)*4+4), GFP_KERNEL);
+if ( temp ) {
+sprintf(temp,"%u,%u,%u,%u",new_policy.max,new_policy.max,new_policy.max,new_policy.max);
+ret=store_scaling_max_freq_limit(&new_policy, temp, count);	
+kfree(temp);
+}
+
+return ret ? ret : count;	
+}
 
 cpufreq_freq_attr_ro_perm(cpuinfo_cur_freq, 0400);
 cpufreq_freq_attr_ro(cpuinfo_min_freq);
