@@ -437,7 +437,9 @@ static ssize_t store_##file_name					\
 }
 
 store_one(scaling_min_freq, min);
+#ifndef CONFIG_HOTPLUG_CPU
 store_one(scaling_max_freq, max);
+#endif
 
 /**
  * show_cpuinfo_cur_freq - current CPU frequency as detected by hardware
@@ -644,6 +646,107 @@ static ssize_t show_bios_limit(struct cpufreq_policy *policy, char *buf)
 	return sprintf(buf, "%u\n", policy->cpuinfo.max_freq);
 }
 
+static ssize_t store_scaling_max_freq_limit(struct cpufreq_policy *policy,
+					const char *buf, size_t count)
+{
+	unsigned int ret = -EINVAL;		
+	unsigned int cpu;			
+	struct cpufreq_policy new_policy;				
+	int max = 0;
+	
+	ret = sscanf(buf, "%u,%u,%u,%u", &tegra_pmqos_cpu_freq_limits[0], &tegra_pmqos_cpu_freq_limits[1],
+		&tegra_pmqos_cpu_freq_limits[2], &tegra_pmqos_cpu_freq_limits[3]);
+		
+	if (ret < 4)
+		return -EINVAL;
+
+	// maxwen: apply new policy->max to all online cpus
+	// all non-online will get correct policy->max when they become
+	// online again in cpu-tegra.c:tegra_cpu_init
+#ifdef CONFIG_HOTPLUG_CPU
+	for_each_online_cpu(cpu) {
+		policy = cpufreq_cpu_get(cpu);
+		if (!policy)
+			continue;
+		
+		ret = cpufreq_get_policy(&new_policy, cpu);
+		if (ret)							
+			continue;
+
+		BUG_ON(cpu > 3);
+		max = tegra_pmqos_cpu_freq_limits[cpu];
+		if (max == 0)
+			// valus = 0 means reset to default
+			max = tegra_pmqos_boost_freq;						
+		
+		new_policy.max = max;
+		ret = __cpufreq_set_policy(policy, &new_policy);
+		policy->user_policy.max = new_policy.max;
+		if (!ret)
+			pr_info("maxwen:store_scaling_max_freq_limit set policy->max of cpu %d to %d - ok\n", cpu, new_policy.max);
+		
+		cpufreq_cpu_put(policy);
+	}
+#endif
+	return count;
+}
+
+#ifdef CONFIG_HOTPLUG_CPU
+static ssize_t store_scaling_max_freq(struct cpufreq_policy *policy,
+					const char *buf, size_t count)
+{
+	unsigned int ret = -EINVAL;		
+	unsigned int cpu;			
+	struct cpufreq_policy new_policy;				
+	int max = 0;
+	unsigned int max_freq;
+	
+	ret = sscanf(buf, "%u", &max_freq);
+		
+	if (ret != 1)
+		return -EINVAL;
+
+	if (max_freq != 0 && max_freq < T3_LP_MAX_FREQ)
+		return -EINVAL;
+
+	// maxwen: this will overwrite any values set by
+	// scaling_max_freq_limit
+	tegra_pmqos_cpu_freq_limits[0]=max_freq;
+	tegra_pmqos_cpu_freq_limits[1]=max_freq;
+	tegra_pmqos_cpu_freq_limits[2]=max_freq;
+	tegra_pmqos_cpu_freq_limits[3]=max_freq;
+				
+	// maxwen: apply new policy->max to all online cpus
+	// all non-online will get correct policy->max when they become
+	// online again in cpu-tegra.c:tegra_cpu_init
+	for_each_online_cpu(cpu) {
+		policy = cpufreq_cpu_get(cpu);
+		if (!policy)
+			continue;
+	
+		ret = cpufreq_get_policy(&new_policy, cpu);
+		if (ret)							
+			continue;					
+		
+		BUG_ON(cpu > 3);
+		max = tegra_pmqos_cpu_freq_limits[cpu];
+		if (max == 0)
+			// valus = 0 means reset to default
+			max = tegra_pmqos_boost_freq;						
+
+		new_policy.max = max;
+		ret = __cpufreq_set_policy(policy, &new_policy);
+		policy->user_policy.max = new_policy.max;
+		if (!ret)
+			pr_info("maxwen:store_scaling_max_freq set policy->max of cpu %d to %d - ok\n", cpu, new_policy.max);
+		
+		cpufreq_cpu_put(policy);
+	}
+	return count;
+}
+#endif
+
+
 #ifdef CONFIG_VOLTAGE_CONTROL
 /*
 * Tegra3 voltage control via cpufreq by Paul Reioux (faux123)
@@ -802,6 +905,7 @@ cpufreq_freq_attr_ro(related_cpus);
 cpufreq_freq_attr_ro(affected_cpus);
 cpufreq_freq_attr_rw(scaling_min_freq);
 cpufreq_freq_attr_rw(scaling_max_freq);
+cpufreq_freq_attr_rw(scaling_max_freq_limit);
 cpufreq_freq_attr_rw(scaling_governor);
 cpufreq_freq_attr_rw(scaling_setspeed);
 #ifdef CONFIG_VOLTAGE_CONTROL
@@ -817,6 +921,7 @@ static struct attribute *default_attrs[] = {
 	&cpuinfo_transition_latency.attr,
 	&scaling_min_freq.attr,
 	&scaling_max_freq.attr,
+	&scaling_max_freq_limit.attr,
 	&affected_cpus.attr,
 	&related_cpus.attr,
 	&scaling_governor.attr,
