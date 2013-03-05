@@ -139,6 +139,7 @@ extern int nr_processes(void);
 extern unsigned long nr_running(void);
 extern unsigned long nr_uninterruptible(void);
 extern unsigned long nr_iowait(void);
+extern unsigned long get_avg_nr_running(unsigned int cpu);
 extern unsigned long avg_nr_running(void);
 extern unsigned long nr_iowait_cpu(int cpu);
 extern unsigned long this_cpu_load(void);
@@ -2050,8 +2051,6 @@ extern void wake_up_idle_cpu(int cpu);
 static inline void wake_up_idle_cpu(int cpu) { }
 #endif
 
-extern void force_cpu_resched(int cpu);
-
 extern unsigned int sysctl_sched_latency;
 extern unsigned int sysctl_sched_min_granularity;
 extern unsigned int sysctl_sched_wakeup_granularity;
@@ -2787,3 +2786,4 @@ static inline unsigned long rlimit_max(unsigned int limit)
 #endif /* __KERNEL__ */
 
 #endif
+

@@ -207,7 +207,7 @@ config HTC_BATT_CORE
 config HTC_POWER_OFF
        bool "HTC Power Off"
        help
-          Switch power off to reboot if cable attached
+          Switch power off to reboot if cable attached# CONFIG_TEGRA_CPUQUIET is not set
 
 config HTC_PROJECT
        bool "HTC Project"
@@ -231,7 +231,7 @@ config MACH_ENDEAVORU
        select TEGRA_SLOW_CSITE
        select VIDEO_CHANGE_IN_AD5823
        select RAWCHIP_ENABLE
-       select TEGRA_CPU_AP33
+       select TEGRA_CPU_AP33# CONFIG_TEGRA_CPUQUIET is not set
        help
          Support for HTC Endeavor#U platform
          jj
@@ -524,6 +524,11 @@ config TEGRA_AUTO_HOTPLUG
 	  This option enables turning CPUs off/on and switching tegra
 	  high/low power CPU clusters automatically, corresponding to
 	  CPU frequency scaling.
+
+config TEGRA_CPUQUIET
+	bool "Use cpuquiet"
+	depends on HOTPLUG_CPU && CPU_FREQ && !ARCH_CPU_PROBE_RELEASE && !ARCH_TEGRA_2x_SOC
+	select TEGRA_AUTO_HOTPLUG
 
 config BEST_TRADE_HOTPLUG
 	bool "Hotplug depends on power-performance tradeoff"
