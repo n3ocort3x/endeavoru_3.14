@@ -92,22 +92,19 @@ void wl1271_elp_work(struct work_struct *work)
 
 	set_bit(WL1271_FLAG_IN_ELP, &wl->flags);
 
-	/* wow_enabled is set during suspending */
-	if (wl->wow_enabled) {
-		wl1271_info("@@@ chip to elp..");
-		htc_wake_debug = 1;  //HTC_CSP
-	}
 out:
 	mutex_unlock(&wl->mutex);
 }
-
-#define ELP_ENTRY_DELAY  5
 
 /* Routines to toggle sleep mode while in ELP */
 void wl1271_ps_elp_sleep(struct wl1271 *wl)
 {
 	struct wl12xx_vif *wlvif;
 	u32 timeout;
+
+	/* We do not enter elp sleep in PLT mode */
+	if (wl->plt)
+		return;
 
 	/* we shouldn't get consecutive sleep requests */
 	if (WARN_ON(test_and_set_bit(WL1271_FLAG_ELP_REQUESTED, &wl->flags)))
@@ -122,11 +119,7 @@ void wl1271_ps_elp_sleep(struct wl1271 *wl)
 			return;
 	}
 
-	if (wl->conf.conn.forced_ps)
-		timeout = ELP_ENTRY_DELAY;
-	else
-		timeout = ELP_ENTRY_DELAY; //wl->conf.conn.elp_timeout; //HTC_WIFI, reduce the delay before we send ELP command
-
+	timeout = wl->conf.conn.elp_timeout;
 	ieee80211_queue_delayed_work(wl->hw, &wl->elp_work,
 				     msecs_to_jiffies(timeout));
 }
@@ -151,6 +144,10 @@ int wl1271_ps_elp_wakeup(struct wl1271 *wl)
 
 	if (!test_bit(WL1271_FLAG_IN_ELP, &wl->flags))
 		return 0;
+
+	/* If we have SDIO error - don't try to wakeup */
+	if (test_bit(WL1271_FLAG_IO_FAILED, &wl->flags))
+		return -EIO;
 
 	wl1271_debug(DEBUG_PSM, "waking up chip from elp");
 

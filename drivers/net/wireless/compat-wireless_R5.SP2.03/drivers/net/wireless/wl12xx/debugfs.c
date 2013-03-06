@@ -354,7 +354,7 @@ static ssize_t dynamic_ps_timeout_write(struct file *file,
 		wl1271_warning("dyanmic_ps_timeout is not in valid range");
 		return -ERANGE;
 	}
-	
+
 	mutex_lock(&wl->mutex);
 
 	wl->conf.conn.dynamic_ps_timeout = value;
