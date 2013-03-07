@@ -107,4 +107,3 @@ extern ssize_t cpuquiet_auto_sysfs_store(struct kobject *kobj,
 					struct attribute *attr, const char *buf,
 					size_t count);
 #endif
-

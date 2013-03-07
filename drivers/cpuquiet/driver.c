@@ -200,4 +200,3 @@ void cpuquiet_unregister_driver(struct cpuquiet_driver *drv)
 	mutex_unlock(&cpuquiet_lock);
 }
 EXPORT_SYMBOL(cpuquiet_unregister_driver);
-

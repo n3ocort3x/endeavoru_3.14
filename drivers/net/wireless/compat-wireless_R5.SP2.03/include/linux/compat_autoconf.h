@@ -2,12 +2,12 @@
 #define COMPAT_AUTOCONF_INCLUDED
 /*
  * Automatically generated C config: don't edit
- * Tue Mar  5 12:38:24 CET 2013 
- * compat-wireless-2.6: ol_R5.00.14
- * linux-2.6: ol_R5.00.21-23-g618c7e5
+ * Thu Mar  7 17:46:35 CET 2013 
+ * compat-wireless-2.6: ol_R5.SP3.03
+ * linux-2.6: ol_R5.SP3.03
  */
-#define COMPAT_RELEASE "ol_R5.00.14"
-#define COMPAT_KERNEL_RELEASE "ol_R5.00.21-23-g618c7e5"
+#define COMPAT_RELEASE "ol_R5.SP3.03"
+#define COMPAT_KERNEL_RELEASE "ol_R5.SP3.03"
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
 #error Compat-wireless requirement: Linux >= 2,6,24
 #endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) */ 

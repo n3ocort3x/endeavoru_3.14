@@ -114,4 +114,3 @@ void cpuquiet_device_free(void)
 			cpuquiet_curr_governor->device_free_notification)
 		cpuquiet_curr_governor->device_free_notification();
 }
-

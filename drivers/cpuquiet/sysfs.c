@@ -289,4 +289,3 @@ void cpuquiet_remove_dev(unsigned int cpu)
 	if (cpu < CONFIG_NR_CPUS && cpuquiet_cpu_devices[cpu])
 		kobject_put(&cpuquiet_cpu_devices[cpu]->kobj);
 }
-

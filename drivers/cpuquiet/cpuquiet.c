@@ -30,4 +30,3 @@ static int __init cpuquiet_init(void)
 }
 
 core_initcall(cpuquiet_init);
-

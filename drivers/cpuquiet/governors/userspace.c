@@ -58,4 +58,3 @@ fs_initcall(init_usermode);
 module_init(init_usermode);
 #endif
 module_exit(exit_usermode);
-

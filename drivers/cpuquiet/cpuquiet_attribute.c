@@ -131,4 +131,3 @@ ssize_t cpuquiet_auto_sysfs_show(struct kobject *kobj,
 
 	return cattr->show(cattr, buf);
 }
-
