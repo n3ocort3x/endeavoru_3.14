@@ -158,6 +158,12 @@ config CPU_FREQ_DEFAULT_GOV_SMARTMAX
 	help
 	  Use the CPUFreq governor 'smartmax' as default
 
+config CPU_FREQ_DEFAULT_GOV_SMARTMAX_BATTERY
+	bool "smartmax_battery"
+	select CPU_FREQ_GOV_SMARTMAX_BATTERY
+	help
+	  Use the CPUFreq governor 'smartmax' as default
+
 config CPU_FREQ_GOV_USERSPACE
 	tristate "'userspace' governor for userspace frequency scaling"
 	help
@@ -262,6 +268,12 @@ config CPU_FREQ_GOV_SMARTMAX
 	select CPU_FREQ_TABLE
 	help
 	  'smartmax' combined ondemand and smartass2
+
+config CPU_FREQ_GOV_SMARTMAX_BATTERY
+	tristate "'smartmax_battery' cpufreq policy governor"
+	select CPU_FREQ_TABLE
+	help
+	  'smartmax_battery' combined ondemand and smartass2
 
 config CPU_FREQ_GOV_CONSERVATIVE
 	tristate "'conservative' cpufreq governor"
