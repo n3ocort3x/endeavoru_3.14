@@ -70,13 +70,13 @@ static unsigned int ramp_down_step;
 /*
  * CPU freq will be increased if measured load > max_cpu_load;
  */
-#define DEFAULT_MAX_CPU_LOAD 65
+#define DEFAULT_MAX_CPU_LOAD 80
 static unsigned int max_cpu_load;
 
 /*
  * CPU freq will be decreased if measured load < min_cpu_load;
  */
-#define DEFAULT_MIN_CPU_LOAD 35
+#define DEFAULT_MIN_CPU_LOAD 45
 static unsigned int min_cpu_load;
 
 /*
@@ -99,12 +99,12 @@ static unsigned int sampling_rate;
 #define DEFAULT_INPUT_BOOST_DURATION 50000000
 static unsigned int input_boost_duration;
 
-static unsigned int touch_poke_freq = 1000000;
+static unsigned int touch_poke_freq = 1300000;
 static bool touch_poke = true;
 
 static bool sync_cpu_downscale = false;
 
-static unsigned int boost_freq = 1000000;
+static unsigned int boost_freq = 1300000;
 static bool boost = true;
 static unsigned int boost_duration = 0;
 
@@ -955,6 +955,8 @@ static struct attribute * smartmax_attributes[] = {
 	&sync_cpu_downscale_attr.attr,
 	&boost_freq_attr.attr,
 	&boost_duration_attr.attr,
+	&io_is_busy_attr.attr,
+	&ignore_nice_attr.attr,
 	NULL,
 };
 
@@ -984,13 +986,14 @@ static int cpufreq_smartmax_boost_task (
 		if (boost_running)
 			continue;
 			
-        boost_running = true;
         /* boost ASAP */
         /* we always boost cpu 0 */
         if (tegra_input_boost(0, cur_boost_freq) < 0){
             continue;
         }
 
+        boost_running = true;
+        
         boost_end_time =
             ktime_to_ns(ktime_get()) + boost_duration;
 
