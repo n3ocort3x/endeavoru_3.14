@@ -1836,14 +1836,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		}
 		this_dbs_info->cpu = cpu;
 		this_dbs_info->rate_mult = 1;
-#ifdef CONFIG_CPU_FREQ_GOV_ONDEMAND_FLEXRATE
-		this_dbs_info->flex_hotplug_sample_delay = 0;
-		this_dbs_info->flex_hotplug_sample_delay_count = 0;
-#endif
-		/*
-		 * Start the timerschedule work, when this governor
-		 * is used for first time
-		 */
+
 		if (dbs_enable == 1) {
 			rc = sysfs_create_group(cpufreq_global_kobject,
 						&dbs_attr_group);
@@ -1855,46 +1848,24 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 			min_sampling_rate = MIN_SAMPLING_RATE;
 			dbs_tuners_ins.sampling_rate = DEF_SAMPLING_RATE;
 		}
-		mutex_unlock(&dbs_mutex);
 
-		register_reboot_notifier(&reboot_notifier);
+		mutex_unlock(&dbs_mutex);
 
 		mutex_init(&this_dbs_info->timer_mutex);
 		dbs_timer_init(this_dbs_info);
-
-#if !EARLYSUSPEND_HOTPLUGLOCK
-		register_pm_notifier(&pm_notifier);
-#endif
-#ifdef CONFIG_HAS_EARLYSUSPEND
-		register_early_suspend(&early_suspend);
-#endif
-		break;
+	break;
 
 	case CPUFREQ_GOV_STOP:
-#ifdef CONFIG_HAS_EARLYSUSPEND
-		unregister_early_suspend(&early_suspend);
-#endif
-#if !EARLYSUSPEND_HOTPLUGLOCK
-		unregister_pm_notifier(&pm_notifier);
-#endif
-#ifdef CONFIG_CPU_FREQ_LCD_FREQ_DFS
-		_lcdfreq_lock(0);
-#endif
-
 		dbs_timer_exit(this_dbs_info);
 
 		mutex_lock(&dbs_mutex);
 		mutex_destroy(&this_dbs_info->timer_mutex);
-
-		unregister_reboot_notifier(&reboot_notifier);
-
 		dbs_enable--;
-		mutex_unlock(&dbs_mutex);
 
 		if (!dbs_enable)
 			sysfs_remove_group(cpufreq_global_kobject,
 					   &dbs_attr_group);
-
+		mutex_unlock(&dbs_mutex);
 		break;
 
 	case CPUFREQ_GOV_LIMITS:
