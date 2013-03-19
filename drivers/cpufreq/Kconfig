@@ -173,9 +173,9 @@ config CPU_FREQ_GOV_USERSPACE
 
 	  If in doubt, say Y.
 
-config CPU_FREQ_DEFAULT_GOV_N3OCOLD
-	 bool "n3ocold"
-	 select CPU_FREQ_GOV_N3OCOLD
+config CPU_FREQ_DEFAULT_GOV_PEGASUSQ
+	 bool "pegasusq"
+	 select CPU_FREQ_GOV_PEGASUSQ
 
 config CPU_FREQ_GOV_ONDEMAND
 	tristate "'ondemand' cpufreq policy governor"
@@ -254,8 +254,8 @@ config CPU_FREQ_GOV_INTERACTIVE
 
 	  If in doubt, say N.
 
-config CPU_FREQ_GOV_N3OCOLD
-	tristate "'n3ocold' cpufreq policy governor"
+config CPU_FREQ_GOV_PEGASUSQ
+	tristate "'pegasusq' cpufreq policy governor"
 
 config CPU_FREQ_GOV_SMARTMAX
 	tristate "'smartmax' cpufreq policy governor"

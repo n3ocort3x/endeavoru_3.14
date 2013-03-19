@@ -12,7 +12,7 @@ obj-$(CONFIG_CPU_FREQ_GOV_TOUCHDEMAND)  += cpufreq_touchdemand.o
 obj-$(CONFIG_CPU_FREQ_GOV_INTELLIDEMAND)+= cpufreq_intellidemand.o
 obj-$(CONFIG_CPU_FREQ_GOV_CONSERVATIVE)	+= cpufreq_conservative.o
 obj-$(CONFIG_CPU_FREQ_GOV_INTERACTIVE)	+= cpufreq_interactive.o
-obj-$(CONFIG_CPU_FREQ_GOV_N3OCOLD)    += cpufreq_n3ocold.o
+obj-$(CONFIG_CPU_FREQ_GOV_PEGASUSQ)    += cpufreq_pegasusq.o
 obj-$(CONFIG_CPU_FREQ_GOV_SMARTMAX)    += cpufreq_smartmax.o
 obj-$(CONFIG_CPU_FREQ_GOV_BATTERYMAX)    += cpufreq_batterymax.o
 
