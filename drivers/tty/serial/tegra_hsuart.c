@@ -158,7 +158,7 @@ static struct pm_qos_request_list a2dp_cpu_minfreq_req;
 
 
 static unsigned char a2dp_tuning_state;
-static unsigned int a2dp_tuning_freq = A2DP_CPU_FREQ_MIN; 
+static unsigned int a2dp_tuning_freq = TI_A2DP_CPU_FREQ_MIN; 
 
 #define SERIAL_HS_CREATE_DEVICE_ATTR(_name)		\
 	struct device_attribute dev_attr_##_name = {	\
@@ -195,31 +195,30 @@ static ssize_t show_a2dp_tuning(struct device *dev,
         return sprintf(buf, "%d\n", a2dp_tuning_state);
 }
 
-static ssize_t store_a2dp_tuning(struct device *dev,
-            struct device_attribute *attr, const char *buf, size_t count)
+static ssize_t store_a2dp_tuning(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
-        char in_char[] = "0";
-		unsigned int value; 
+		char in_char[] = "0";
+		unsigned int value;
 
-        sscanf(buf, "%1s", in_char);
+		sscanf(buf, "%1s", in_char);
 
-        if (strcmp(in_char, "0") == 0) {
-                value = 0;
-        }
-       value = 1; 
+		if (strcmp(in_char, "0") == 0) {
+			value = 0;
 		}
-		if (value == a2dp_tuning_state) 
+		else if (strcmp(in_char, "1") == 0) {
+		value = 1;
+		}
+			if (value == a2dp_tuning_state)
 			return count;
-				a2dp_tuning_state = value;
-			if (1 == a2dp_tuning_state) 
-				pm_qos_update_request(&a2dp_cpu_minfreq_req, (s32)a2dp_tuning_freq); 
-			else if (0 == a2dp_tuning_state) 
 
-                pm_qos_update_request(&a2dp_cpu_minfreq_req, (s32)PM_QOS_CPU_FREQ_MIN_DEFAULT_VALUE);
-  
-	return count;
+a2dp_tuning_state = value;
+	if (1 == a2dp_tuning_state)
+		pm_qos_update_request(&a2dp_cpu_minfreq_req, (s32)a2dp_tuning_freq);
+	else if (0 == a2dp_tuning_state)
+		pm_qos_update_request(&a2dp_cpu_minfreq_req, (s32)PM_QOS_CPU_FREQ_MIN_DEFAULT_VALUE);
+
+return count;
 }
-
 static ssize_t show_a2dp_tuning_freq(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	return sprintf(buf, "%u\n", a2dp_tuning_freq);
