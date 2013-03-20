@@ -37,7 +37,7 @@
 #include "gadget_chips.h"
 
 
-#define PM_QOS_USB_TP_CPU_FREQ 910
+#define PM_QOS_USB_TP_CPU_FREQ 500
 static struct pm_qos_request_list pm_qos_req_tp;
 
 enum {
