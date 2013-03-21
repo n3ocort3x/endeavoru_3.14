@@ -56,6 +56,10 @@
 extern int mpdecision_gmode_notifier(void);
 #endif
 
+#ifdef CONFIG_TEGRA_CPUQUIET
+extern void tegra_cpuquiet_force_gmode(void);
+#endif 
+
 unsigned int tegra_pmqos_boost_freq = BOOST_CPU_FREQ_MIN;
 unsigned int tegra_pmqos_cap_freq = CAP_CPU_FREQ_MAX;
 unsigned int miss_freq_set=0;
@@ -342,7 +346,9 @@ int tegra_system_edp_alarm(bool alarm)
 	if (!ret || !alarm)
 		tegra_edp_throttle_cpu_now(0);
 
-	mutex_unlock(&tegra_cpu_lock);
+	mutex_unlock(&tegra+#ifdef CONFIG_TEGRA_CPUQUIET
++extern void tegra_cpuquiet_force_gmode(void);
++#endif _cpu_lock);
 
 	return ret;
 }
@@ -433,7 +439,9 @@ static void tegra_cpu_edp_init(bool resume)
 	tegra_get_cpu_edp_limits(&cpu_edp_limits, &cpu_edp_limits_size);
 
 	if (!(cpu_edp_limits || system_edp_limits)) {
-		if (!resume)
+		if (!resume)+#ifdef CONFIG_TEGRA_CPUQUIET
++extern void tegra_cpuquiet_force_gmode(void);
++#endif 
 			pr_info("cpu-tegra: no EDP table is provided\n");
 		return;
 	}
@@ -553,7 +561,7 @@ int tegra_update_cpu_speed(unsigned long rate)
 	if (rate_save > 475000) {
 		if (is_lp_cluster()) {
 
-			pr_info("LP off %d %d %ld\n", freqs.old, freqs.new, rate_save);
+			pr_info("tegra_update_cpu_speed: LP off %d %d %ld\n", freqs.old, freqs.new, rate_save); 
 			/* set rate to max of LP mode */
 			ret = clk_set_rate(cpu_clk, 475000 * 1000);
 #ifndef CONFIG_TEGRA_MPDECISION
@@ -567,7 +575,7 @@ int tegra_update_cpu_speed(unsigned long rate)
              */
              status = mpdecision_gmode_notifier();
              if (status == 0)
-             	pr_err("%s: couldn't switch to gmode (freq)", __func__ );
+             	pr_err("tegra_update_cpu_speed: %s: couldn't switch to gmode (freq)", __func__ );
 #endif
 			/* restore the target frequency, and
 			 * let the rest of the function handle
@@ -589,13 +597,13 @@ int tegra_update_cpu_speed(unsigned long rate)
 	if (freqs.old < freqs.new) {
 		ret = tegra_update_mselect_rate(freqs.new);
 		if (ret) {
-			pr_err("cpu-tegra: Failed to scale mselect for cpu"
-			       " frequency %u kHz\n", freqs.new);
+			pr_err("tegra_update_cpu_speed: Failed to scale mselect for cpu" 
+				   " frequency %u kHz\n", freqs.new); 
 			return ret;
 		}
 		ret = clk_set_rate(emc_clk, tegra_emc_to_cpu_ratio(freqs.new));
 		if (ret) {
-			pr_err("cpu-tegra: Failed to scale emc for cpu"
+			 pr_err("tegra_update_cpu_speed: Failed to scale emc for cpu" 
 			       " frequency %u kHz\n", freqs.new);
 			return ret;
 		}
@@ -607,10 +615,16 @@ int tegra_update_cpu_speed(unsigned long rate)
 
 	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
 	if (ret) {
-		pr_err("cpu-tegra: Failed to set cpu frequency to %d kHz\n",
+		 pr_err("tegra_update_cpu_speed: Failed to set cpu frequency to %d kHz\n", 
 			freqs.new);
 		return ret;
 	}
+
+#if 0
+	else {
+	pr_info("tegra_update_cpu_speed: old=%d new=%d\n", freqs.old, tegra_getspeed(0));
+  		 }
+#endif 
 
 	for_each_online_cpu(freqs.cpu)
 		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
@@ -1997,8 +2011,7 @@ int tegra_cpu_set_speed_cap(unsigned int *speed_cap)
 		*speed_cap = new_speed;
 
 	ret = tegra_update_cpu_speed(new_speed);
-	if (ret == 0)
-		tegra_auto_hotplug_governor(new_speed, false);
+ 		tegra_auto_hotplug_governor(new_speed, false); 
 	return ret;
 }
 
@@ -2240,6 +2253,11 @@ static void tegra_cpufreq_early_suspend(struct early_suspend *h)
 
 static void tegra_cpufreq_late_resume(struct early_suspend *h)
 {
+
+#ifdef CONFIG_TEGRA_CPUQUIET
+tegra_cpuquiet_force_gmode();
+#endif
+
 	unsigned int i = 0;
 	for (i=0; i<=CONFIG_NR_CPUS; ++i)
 		pr_info("Xmister: max_freq on resume at %u is %lu\n",i,policy_max_speed[i]);
@@ -2322,27 +2340,6 @@ static struct kernel_param_ops perf_early_suspend_ops = {
 };
 
 module_param_cb(perf_early_suspend, &perf_early_suspend_ops, &perf_early_suspend, 0644);
-
-#ifdef CONFIG_TEGRA3_VARIANT_CPU_OVERCLOCK
-static int enable_oc_set(const char *arg, const struct kernel_param *kp)
-{
-    int ret = param_set_int(arg, kp);
-    pr_info("enable_oc %d\n", enable_oc);
-	return 0;
-}
-
-static int enable_oc_get(char *buffer, const struct kernel_param *kp)
-{
-	return param_get_uint(buffer, kp);
-}
-
-static struct kernel_param_ops enable_oc_ops = {
-	.set = enable_oc_set,
-	.get = enable_oc_get,
-};
-
-module_param_cb(enable_oc, &enable_oc_ops, &enable_oc, 0644);
-#endif
 
 static int __init tegra_cpufreq_init(void)
 {

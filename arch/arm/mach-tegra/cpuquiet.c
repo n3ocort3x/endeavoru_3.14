@@ -38,7 +38,7 @@
 #include "clock.h"
 
 #define INITIAL_STATE		TEGRA_CPQ_IDLE
-#define UP_DELAY_MS		70
+#define UP_DELAY_MS			70
 #define DOWN_DELAY_MS		500
 
 static struct mutex *tegra3_cpu_lock;
@@ -55,6 +55,8 @@ static unsigned long down_delay;
 static int mp_overhead = 10;
 static unsigned int idle_top_freq;
 static unsigned int idle_bottom_freq;
+static int lpup_req = 0;
+static int lpdown_req = 0; 
 
 static struct clk *cpu_clk;
 static struct clk *cpu_g_clk;
@@ -277,10 +279,22 @@ static int max_cpus_notify(struct notifier_block *nb, unsigned long n, void *p)
 	return NOTIFY_OK;
 }
 
+void tegra_cpuquiet_force_gmode(void)
+{
+	if (is_lp_cluster()) 	{
+			if (cpq_state != TEGRA_CPQ_SWITCH_TO_G) {
+							/* Force switch */
+							cpq_state = TEGRA_CPQ_SWITCH_TO_G;
+           					lpup_req = 0;
+            				lpdown_req = 0;
+								queue_delayed_work(
+								cpuquiet_wq, &cpuquiet_work, up_delay);
+							}
+			}
+}
+
 void tegra_auto_hotplug_governor(unsigned int cpu_freq, bool suspend)
 {
-    static int lpup_req = 0;
-    static int lpdown_req = 0;
 
 	if (!is_g_cluster_present())
 		return;
