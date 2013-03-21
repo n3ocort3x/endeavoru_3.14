@@ -501,7 +501,7 @@ static struct actmon_dev actmon_dev_emc = {
 	.boost_up_coef		= 200,
 	.boost_down_coef	= 50,
 	.boost_up_threshold	= 75,
-	.boost_down_threshold	= 45,
+	.boost_down_threshold	= 35,
 
 	.up_wmark_window	= 1,
 	.down_wmark_window	= 3,
@@ -533,7 +533,7 @@ static struct actmon_dev actmon_dev_avp = {
 	.boost_up_coef		= 200,
 	.boost_down_coef	= 50,
 	.boost_up_threshold	= 80,
-	.boost_down_threshold	= 45,
+	.boost_down_threshold	= 50,
 
 	.up_wmark_window	= 1,
 	.down_wmark_window	= 3,
