@@ -148,7 +148,7 @@ static struct dbs_tuners {
 	.down_differential = DEF_FREQUENCY_DOWN_DIFFERENTIAL,
 	.ignore_nice = 0,
 	.powersave_bias = 0,
-	.touch_floor_freq = 475000,
+	.touch_floor_freq = 500000,
 	.touch_floor_time = 1000,
 	.touch_min_cores = 0,
 	.touch_factor = 4,
