@@ -11,14 +11,6 @@
  *
  * Based on the ondemand and smartmax governor
  *
- * ondemand:
- *  Copyright (C)  2001 Russell King
- *            (C)  2003 Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>.
- *                      Jun Nakajima <jun.nakajima@intel.com>
- *
- * smartassV2:
- * Author: Erasmux
- *
  * For a general overview of smartmax see the relavent part in
  * Documentation/cpu-freq/governors.txt
  *
@@ -39,8 +31,6 @@
 #include <linux/slab.h>
 #include <linux/kernel_stat.h>
 
-#include "../../arch/arm/mach-tegra/tegra_pmqos.h"
-
 /******************** Tunable parameters: ********************/
 
 /*
@@ -48,7 +38,7 @@
  * towards the ideal frequency and slower after it has passed it. Similarly,
  * lowering the frequency towards the ideal frequency is faster than below it.
  */
-#define DEFAULT_IDEAL_FREQ T3_LP_MAX_FREQ
+#define DEFAULT_IDEAL_FREQ 500000
 static unsigned int ideal_freq;
 
 /*
@@ -71,32 +61,32 @@ static unsigned int ramp_down_step;
  * CPU freq will be increased if measured load > max_cpu_load;
  */
 #define DEFAULT_MAX_CPU_LOAD 80
-static unsigned int max_cpu_load;
+static unsigned long max_cpu_load;
 
 /*
  * CPU freq will be decreased if measured load < min_cpu_load;
  */
 #define DEFAULT_MIN_CPU_LOAD 45
-static unsigned int min_cpu_load;
+static unsigned long min_cpu_load;
 
 /*
  * The minimum amount of time to spend at a frequency before we can ramp up.
  * Notice we ignore this when we are below the ideal frequency.
  */
 #define DEFAULT_UP_RATE_US 20000
-static unsigned int up_rate_us;
+static unsigned long up_rate_us;
 
 /*
  * The minimum amount of time to spend at a frequency before we can ramp down.
  * Notice we ignore this when we are above the ideal frequency.
  */
 #define DEFAULT_DOWN_RATE_US 40000
-static unsigned int down_rate_us;
+static unsigned long down_rate_us;
 
 #define DEFAULT_SAMPLING_RATE 50000
 static unsigned int sampling_rate;
 
-#define DEFAULT_INPUT_BOOST_DURATION 50000000
+#define DEFAULT_INPUT_BOOST_DURATION 80000000
 static unsigned int input_boost_duration;
 
 static unsigned int touch_poke_freq = 1300000;
@@ -107,13 +97,6 @@ static bool sync_cpu_downscale = false;
 static unsigned int boost_freq = 1300000;
 static bool boost = true;
 static unsigned int boost_duration = 0;
-
-/* Consider IO as busy */
-#define DEFAULT_IO_IS_BUSY 1
-static unsigned int io_is_busy;
-
-#define DEFAULT_IGNORE_NICE 1
-static unsigned int ignore_nice;
 
 /*************** End of tunables ***************/
 
@@ -456,6 +439,8 @@ static void cpufreq_smartmax_timer(struct smartmax_info_s *this_smartmax)
 		unsigned int idle_time, wall_time, iowait_time;
 		unsigned int load, load_freq;
 		int freq_avg;
+		cputime64_t cur_nice;
+		unsigned long cur_nice_jiffies;
 
 		j_this_smartmax = &per_cpu(smartmax_info, j);
 
@@ -474,10 +459,6 @@ static void cpufreq_smartmax_timer(struct smartmax_info_s *this_smartmax)
 				j_this_smartmax->prev_cpu_iowait);
 		j_this_smartmax->prev_cpu_iowait = cur_iowait_time;
 
-		if (ignore_nice) {
-			cputime64_t cur_nice;
-			unsigned long cur_nice_jiffies;
-
 			cur_nice = cputime64_sub(kstat_cpu(j).cpustat.nice,
 					 j_this_smartmax->prev_cpu_nice);
 			/*
@@ -489,7 +470,6 @@ static void cpufreq_smartmax_timer(struct smartmax_info_s *this_smartmax)
 
 			j_this_smartmax->prev_cpu_nice = kstat_cpu(j).cpustat.nice;
 			idle_time += jiffies_to_usecs(cur_nice_jiffies);
-        }
 
 		/*
 		 * For the purpose of ondemand, waiting for disk IO is an
@@ -497,9 +477,6 @@ static void cpufreq_smartmax_timer(struct smartmax_info_s *this_smartmax)
 		 * the system is actually idle. So subtract the iowait time
 		 * from the cpu idle time.
 		 */
-
-		if (io_is_busy && idle_time >= iowait_time)
-			idle_time -= iowait_time;
 
 		if (idle_time >= iowait_time)
 			idle_time -= iowait_time;
@@ -573,26 +550,6 @@ static void do_dbs_timer(struct work_struct *work)
 	
 	schedule_delayed_work_on(cpu, &this_smartmax->work, delay);
 	mutex_unlock(&this_smartmax->timer_mutex);
-}
-
-static void update_idle_time(bool online)
-{
-    int j = 0;
-
-	for_each_possible_cpu(j) {
-		struct smartmax_info_s *j_this_smartmax;
-
-        if (online && !cpu_online(j)){
-            continue;
-        }
-		j_this_smartmax = &per_cpu(smartmax_info, j);
-
-		j_this_smartmax->prev_cpu_idle = get_cpu_idle_time(j,
-						&j_this_smartmax->prev_cpu_wall);
-		if (ignore_nice)
-			j_this_smartmax->prev_cpu_nice = kstat_cpu(j).cpustat.nice;
-
-	}
 }
 
 static ssize_t show_debug_mask(struct kobject *kobj, struct attribute *attr, char *buf)
@@ -862,63 +819,6 @@ static ssize_t store_boost_duration(struct kobject *a, struct attribute *b,
 	return count;
 }
 
-static ssize_t show_io_is_busy(struct kobject *kobj, struct attribute *attr, char *buf)
-{
-	return sprintf(buf, "%d\n", io_is_busy);
-}
-
-static ssize_t store_io_is_busy(struct kobject *a, struct attribute *b,
-				   const char *buf, size_t count)
-{
-	unsigned int input;
-	int ret;
-
-	ret = sscanf(buf, "%u", &input);
-	if (ret != 1)
-		return -EINVAL;
-
-	if (input > 1)
-		input = 1;
-
-	if (input == io_is_busy) { /* nothing to do */
-		return count;
-	}		
-	io_is_busy = input;
-	
-	return count;
-}
-
-static ssize_t show_ignore_nice(struct kobject *kobj, struct attribute *attr, char *buf)
-{
-	return sprintf(buf, "%d\n", ignore_nice);
-}
-
-static ssize_t store_ignore_nice(struct kobject *a, struct attribute *b,
-				      const char *buf, size_t count)
-{
-	unsigned int input;
-	int ret;
-
-	unsigned int j;
-
-	ret = sscanf(buf, "%u", &input);
-	if (ret != 1)
-		return -EINVAL;
-
-	if (input > 1)
-		input = 1;
-
-	if (input == ignore_nice) { /* nothing to do */
-		return count;
-	}
-	ignore_nice = input;
-
-	/* we need to re-evaluate prev_cpu_idle */
-    update_idle_time(true);
-
-	return count;
-}
-
 #define define_global_rw_attr(_name)		\
 static struct global_attr _name##_attr =	\
 	__ATTR(_name, 0644, show_##_name, store_##_name)
@@ -937,8 +837,6 @@ define_global_rw_attr(input_boost_duration);
 define_global_rw_attr(sync_cpu_downscale);
 define_global_rw_attr(boost_freq);
 define_global_rw_attr(boost_duration);
-define_global_rw_attr(io_is_busy);
-define_global_rw_attr(ignore_nice);
 
 static struct attribute * smartmax_attributes[] = {
 	&debug_mask_attr.attr,
@@ -955,8 +853,6 @@ static struct attribute * smartmax_attributes[] = {
 	&sync_cpu_downscale_attr.attr,
 	&boost_freq_attr.attr,
 	&boost_duration_attr.attr,
-	&io_is_busy_attr.attr,
-	&ignore_nice_attr.attr,
 	NULL,
 };
 
@@ -986,14 +882,13 @@ static int cpufreq_smartmax_boost_task (
 		if (boost_running)
 			continue;
 			
+        boost_running = true;
         /* boost ASAP */
         /* we always boost cpu 0 */
         if (tegra_input_boost(0, cur_boost_freq) < 0){
             continue;
         }
 
-        boost_running = true;
-        
         boost_end_time =
             ktime_to_ns(ktime_get()) + boost_duration;
 
@@ -1146,8 +1041,6 @@ static int cpufreq_governor_smartmax(struct cpufreq_policy *new_policy,
 
 		dbs_enable++;
 		
-        update_idle_time(false);
-
 		// Do not register the idle hook and create sysfs
 		// entries if we have already done so.
 		if (dbs_enable == 1) {
@@ -1219,8 +1112,6 @@ static int __init cpufreq_smartmax_init(void)
 	min_cpu_load = DEFAULT_MIN_CPU_LOAD;
 	sampling_rate = DEFAULT_SAMPLING_RATE;
 	input_boost_duration = DEFAULT_INPUT_BOOST_DURATION;
-    io_is_busy = DEFAULT_IO_IS_BUSY;
-    ignore_nice = DEFAULT_IGNORE_NICE;
 
 
 	/* Initalize per-cpu data: */
