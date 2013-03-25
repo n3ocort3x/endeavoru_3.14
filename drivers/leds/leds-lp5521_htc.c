@@ -1293,7 +1293,8 @@ static ssize_t lp5521_led_slow_blink_store(struct device *dev,
 	if(val) {
 		if(!strcmp(ldata->cdev.name, "button-backlight")) {
 			if(backlight_mode != 3 || val != slow_blink_brightness) {
-				slow_blink_brightness = val;
+				// always limit it to any button brightness value
+                                slow_blink_brightness = button_brightness;
 				lp5521_led_current_set_for_key(2);
 			}
 		}
