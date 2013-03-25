@@ -872,7 +872,7 @@ static void led_powerkey_work_func(struct work_struct *work)
 
 	I(" %s +++\n" , __func__);
 	pdata = client->dev.platform_data;
-	if (current_mode == 0 && backlight_mode == 0)
+	if(current_mode == 0 )
 		lp5521_led_enable(client);
 	mutex_lock(&led_mutex);
 	I("%s, backlight_mode: %d\n", __func__, backlight_mode);
