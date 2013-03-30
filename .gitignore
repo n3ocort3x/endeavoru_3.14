@@ -33,6 +33,8 @@ modules.builtin
 *.patch
 *.gcno
 *.xzkern
+*.symvers
+*_autoconf.h
 
 #
 # Top-level generic files
