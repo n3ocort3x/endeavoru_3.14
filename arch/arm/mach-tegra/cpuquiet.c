@@ -37,6 +37,8 @@
 #include "cpu-tegra.h"
 #include "clock.h"
 
+#define CPUQUIET_DEBUG 1
+
 #define INITIAL_STATE		TEGRA_CPQ_IDLE
 #define UP_DELAY_MS			70
 #define DOWN_DELAY_MS		500
@@ -71,8 +73,8 @@ static struct cpumask cr_online_requests;
  * we need at least 2 requests to come out of lpmode.
  * This does not affect frequency overrides
  */
-#define TEGRA_MPDEC_LPCPU_UP_HYS        4
-#define TEGRA_MPDEC_LPCPU_DOWN_HYS      1
+#define TEGRA_CPQ_LPCPU_UP_HYS        4
+#define TEGRA_CPQ_LPCPU_DOWN_HYS      2 
 
 enum {
 	TEGRA_CPQ_DISABLED = 0,
@@ -182,7 +184,7 @@ static void tegra_cpuquiet_work_func(struct work_struct *work)
 			break;
 		case TEGRA_CPQ_SWITCH_TO_LP:
 			if (!is_lp_cluster() && !no_lp &&
-				!pm_qos_request(PM_QOS_MIN_ONLINE_CPUS)
+				!(pm_qos_request(PM_QOS_MIN_ONLINE_CPUS) >= 2)
 				&& num_online_cpus() == 1) {
 				if (!clk_set_parent(cpu_clk, cpu_lp_clk)) {
 					pr_info(CPUQUIET_TAG "LP on\n"),
@@ -246,27 +248,32 @@ static void min_max_constraints_workfunc(struct work_struct *work)
 
 static int min_cpus_notify(struct notifier_block *nb, unsigned long n, void *p)
 {
-	bool g_cluster = false;
+	
+	if (!is_g_cluster_present()) 
+	return; 
 
-	mutex_lock(tegra3_cpu_lock);
 
-	if ((n >= 1) && is_lp_cluster()) {
+	if (cpq_state == TEGRA_CPQ_DISABLED) 
+	return;
+
+	if (is_lp_cluster() && cpq_state != TEGRA_CPQ_SWITCH_TO_G) { 
+	  mutex_lock(tegra3_cpu_lock); 
 		/* make sure cpu rate is within g-mode range before switching */
 		unsigned long speed = max((unsigned long)tegra_getspeed(0),
 					clk_get_min_rate(cpu_g_clk) / 1000);
 		tegra_update_cpu_speed(speed);
 
 		clk_set_parent(cpu_clk, cpu_g_clk);
-		g_cluster = true;
-	}
+		
+		lpup_req = 0;
+		lpdown_req = 0;
 
-	tegra_cpu_set_speed_cap(NULL);
-	mutex_unlock(tegra3_cpu_lock);
+		 mutex_unlock(tegra3_cpu_lock);
 
-	schedule_work(&minmax_work);
+		schedule_work(&minmax_work);
 
-	if (g_cluster)
 		cpuquiet_device_free();
+		 } 
 
 	return NOTIFY_OK;
 }
@@ -307,11 +314,6 @@ void tegra_auto_hotplug_governor(unsigned int cpu_freq, bool suspend)
         lpup_req = 0;
         lpdown_req = 0;
 
-		/* Switch to G-mode if suspend rate is high enough */
-		if (is_lp_cluster() && (cpu_freq >= idle_bottom_freq)) {
-			clk_set_parent(cpu_clk, cpu_g_clk);
-			cpuquiet_device_free();
-		}
 		return;
 	}
 
@@ -330,7 +332,7 @@ void tegra_auto_hotplug_governor(unsigned int cpu_freq, bool suspend)
 	if (is_lp_cluster() && (cpu_freq >= idle_top_freq || no_lp)) {
 		lpdown_req++;
 		lpup_req = 0;
-        if (lpdown_req > TEGRA_MPDEC_LPCPU_DOWN_HYS) {
+        if (lpdown_req > TEGRA_CPQ_LPCPU_DOWN_HYS) {
        		cpq_state = TEGRA_CPQ_SWITCH_TO_G;
        		lpdown_req = 0;
 			queue_delayed_work(cpuquiet_wq, &cpuquiet_work, up_delay);
@@ -339,7 +341,7 @@ void tegra_auto_hotplug_governor(unsigned int cpu_freq, bool suspend)
 		   cpu_freq <= idle_bottom_freq) {
 		lpup_req++;
 		lpdown_req = 0;
-        if (lpup_req > TEGRA_MPDEC_LPCPU_UP_HYS) {
+        if (lpup_req > TEGRA_CPQ_LPCPU_UP_HYS) { 
 			cpq_state = TEGRA_CPQ_SWITCH_TO_LP;
 			lpup_req = 0;
 			queue_delayed_work(cpuquiet_wq, &cpuquiet_work, down_delay);
