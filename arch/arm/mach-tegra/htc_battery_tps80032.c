@@ -53,7 +53,7 @@
 #define SET_FAKE_TEMP		0x4000
 #define SET_FAKE_CAPACITY	0x8000
 
-#define BATTERY_DEBUG 1
+#define BATTERY_DEBUG 0
 
 #if BATTERY_DEBUG
 #define BATT_LOG(fmt, ...) do { \
@@ -1685,7 +1685,8 @@ fast_charge_store(struct device *dev,
 		if(fast_charge != value){
 			fast_charge = value;
 			BATT_LOG("set fast_charge %d", fast_charge);
-			reevaluate_charger();
+			if (htc_batt_info.online != CONNECT_TYPE_NONE && htc_batt_info.online != CONNECT_TYPE_INTERNAL)
+			    reevaluate_charger();
 		}
 	}
 	else
@@ -2113,4 +2114,3 @@ static int __init htc_battery_init(void)
 module_init(htc_battery_init);
 MODULE_DESCRIPTION("HTC Battery Driver");
 MODULE_LICENSE("GPL");
-
