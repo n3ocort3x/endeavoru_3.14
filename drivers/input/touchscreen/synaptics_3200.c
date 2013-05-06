@@ -1784,7 +1784,7 @@ static ssize_t synaptics_s2w_allow_double_tap_dump(struct device *dev,
     }
 	return count;
 }
-
+					/*<set permissions*/
 static DEVICE_ATTR(s2w_allow_double_tap, (S_IWUSR|S_IRUGO),
 	synaptics_s2w_allow_double_tap_show, synaptics_s2w_allow_double_tap_dump);
 
@@ -1817,7 +1817,7 @@ static ssize_t synaptics_s2w_double_tap_duration_dump(struct device *dev,
     }
 	return count;
 }
-
+					    /*<set permissions*/
 static DEVICE_ATTR(s2w_double_tap_duration, (S_IWUSR|S_IRUGO),
 	synaptics_s2w_double_tap_duration_show, synaptics_s2w_double_tap_duration_dump);
 	
@@ -1850,13 +1850,14 @@ static ssize_t synaptics_s2w_double_tap_threshold_dump(struct device *dev,
     }
 	return count;
 }
+					     /*<set permissions*/
+static DEVICE_ATTR(s2w_double_tap_threshold, (S_IWUSR|S_IRUGO),
+	synaptics_s2w_double_tap_threshold_show, synaptics_s2w_double_tap_threshold_dump);
 
 /*==========================*/
 /*DT2W 3 SYSFS-IF, END      */
 /*==========================*/
 
-static DEVICE_ATTR(s2w_double_tap_threshold, (S_IWUSR|S_IRUGO),
-	synaptics_s2w_double_tap_threshold_show, synaptics_s2w_double_tap_threshold_dump);	
 	
 #endif
 
