@@ -1327,7 +1327,7 @@ static ssize_t lp5521_led_currents_store(struct device *dev,
 
 	ret = sscanf(buf, "%d", &val);
 
-	if (ret!=1 || val < 0 || val > 3)
+	if (ret!=1 || val < 0)
 		return -EINVAL;
 
 	D("%s , val = %d\n" , __func__, val);
@@ -1346,14 +1346,11 @@ static ssize_t lp5521_led_currents_store(struct device *dev,
 	udelay(500);
 	/* === set pwm to all === */
 	data = (u8)val;
-	// maxwen TODO disable green and amber currents
-	// interface - writing e.g. 255 to it will create
-	// an extreme bright led
-	/*if(!strcmp(ldata->cdev.name, "green"))	 {
+	if(!strcmp(ldata->cdev.name, "green"))	 {
 		ret = i2c_write_block(client, 0x06, &data, 1);
 	} else if (!strcmp(ldata->cdev.name, "amber")) {
 		ret = i2c_write_block(client, 0x05, &data, 1);
-	} else*/ if (!strcmp(ldata->cdev.name, "button-backlight")) {
+	} else if (!strcmp(ldata->cdev.name, "button-backlight")) {
 		ret = i2c_write_block(client, 0x07, &data, 1);
 	}
 	mutex_unlock(&led_mutex);
@@ -1584,6 +1581,10 @@ static int lp5521_led_probe(struct i2c_client *client
 		gpio_free(pdata->ena_gpio);
 		return ret;
 	}
+	
+	I("led_config default %d %d %d\n", pdata->led_config[0].led_lux, 
+		pdata->led_config[1].led_lux, pdata->led_config[2].led_lux);
+	
    	tegra_gpio_enable(pdata->ena_gpio);
 	button_brightness = pdata->led_config[2].led_lux * 255 / 100;
 	button_brightness_board = button_brightness;
@@ -1797,6 +1798,4 @@ module_exit(lp5521_led_exit);
 
 MODULE_AUTHOR("<ShihHao_Shiung@htc.com>, <Dirk_Chang@htc.com>");
 MODULE_DESCRIPTION("LP5521 LED driver");
-
-
 
