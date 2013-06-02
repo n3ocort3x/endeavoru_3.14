@@ -43,12 +43,12 @@ extern int usb_get_connect_type(void);
 //#define SYN_SUSPEND_RESUME_POWEROFF
 #define SYN_I2C_RETRY_TIMES 10
 #define SHIFT_BITS 10
-/* #define SYN_WIRELESS_DEBUG*/
+#define SYN_WIRELESS_DEBUG
 /* #define SYN_CABLE_CONTROL */
 /* #define SYN_FILTER_CONTROL */
 /* #define SYN_FLASH_PROGRAMMING_LOG */
 /* #define SYN_DISABLE_CONFIG_UPDATE */
-/*#define FAKE_EVENT*/
+#define FAKE_EVENT
 
 struct synaptics_ts_data {
 	uint16_t addr;
@@ -1919,14 +1919,14 @@ static int synaptics_touch_sysfs_init(void)
 		sysfs_create_file(android_touch_kobj, &dev_attr_pdt.attr) ||
 		sysfs_create_file(android_touch_kobj, &dev_attr_htc_event.attr) ||
 		sysfs_create_file(android_touch_kobj, &dev_attr_reset.attr) ||
+		sysfs_create_file(android_touch_kobj, &dev_attr_sr_en.attr) ||
+		sysfs_create_file(android_touch_kobj, &dev_attr_calibration_control.attr)
 #ifdef FAKE_EVENT
-		sysfs_create_file(android_touch_kobj, &dev_attr_fake_event.attr) ||
+		|| sysfs_create_file(android_touch_kobj, &dev_attr_fake_event.attr)
 #endif
-
+#ifdef SYN_WIRELESS_DEBUG
+		|| sysfs_create_file(android_touch_kobj, &dev_attr_enabled.attr)
 #endif
-  		sysfs_create_file(android_touch_kobj, &dev_attr_sr_en.attr) ||
-   	        sysfs_create_file(android_touch_kobj, &dev_attr_calibration_control.attr)
-
 		)
 		return -ENOMEM;
 	if (get_address_base(gl_ts, 0x54, FUNCTION))
@@ -1995,13 +1995,6 @@ static void synaptics_touch_sysfs_remove(void)
 	sysfs_remove_file(android_touch_kobj, &dev_attr_layout.attr);
 	sysfs_remove_file(android_touch_kobj, &dev_attr_pdt.attr);
 	sysfs_remove_file(android_touch_kobj, &dev_attr_htc_event.attr);
-#ifdef SYN_WIRELESS_DEBUG
-        sysfs_remove_file(android_touch_kobj, &dev_attr_reset.attr);
-        sysfs_remove_file(android_touch_kobj, &dev_attr_enabled.attr);
-#ifdef FAKE_EVENT
-        sysfs_remove_file(android_touch_kobj, &dev_attr_fake_event.attr);
-#endif
-#endif
 	sysfs_remove_file(android_touch_kobj, &dev_attr_reset.attr);
 	sysfs_remove_file(android_touch_kobj, &dev_attr_calibration_control.attr);
 #ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
@@ -2018,6 +2011,9 @@ static void synaptics_touch_sysfs_remove(void)
 	/*==========================*/
 	/*DT2W SYSFS STUFF END      */
 	/*==========================*/
+#endif
+#ifdef SYN_WIRELESS_DEBUG
+	sysfs_remove_file(android_touch_kobj, &dev_attr_enabled.attr);
 #endif
 	kobject_del(android_touch_kobj);
 }
@@ -2873,7 +2869,13 @@ static int psensor_tp_status_handler_func(struct notifier_block *this,
 		}
 	}
 
-	ts->psensor_status = status;
+	if (ts->psensor_status == 0) {
+		if (status == 1)
+			ts->psensor_status = status;
+		else
+			ts->psensor_status = 0;
+	} else
+		ts->psensor_status = status;
 
 	if(ts->psensor_detection) {
 		if(ts->psensor_status == 0) {
@@ -3784,25 +3786,16 @@ static int synaptics_ts_resume(struct i2c_client *client)
 		input_report_abs(ts->input_dev, ABS_MT_AMPLITUDE, 0);
 		input_report_abs(ts->input_dev, ABS_MT_POSITION, 1 << 31);
 	}
-	ts->psensor_resume_enable = 0;
- 
-        // no need to mess with psensor if we dont need 
-       // calibration anyway
+
 	if(ts->psensor_detection) {
-		if (ts->packrat_number < SYNAPTICS_FW_NOCAL_PACKRAT) {
-		      if (calibration_control){
-		        if (ts->multitouch_calibration) {
-          			if(ts->psensor_status == 0) {
-           			 ts->psensor_resume_enable = 1;
-           			 printk(KERN_INFO "[TP] %s: Enable P-sensor by Touch\n", __func__);
-          			 psensor_enable_by_touch_driver(1);
-         		 } else if(ts->psensor_phone_enable == 0 ) {
-         		      if(ts->psensor_status != 3)
-           		  ts->psensor_resume_enable = 2;
-           		  ts->psensor_phone_enable = 1;
-          		}
-        	     }
-                   }
+		if(ts->psensor_status == 0) {
+			ts->psensor_resume_enable = 1;
+			printk(KERN_INFO "[TP] %s: Enable P-sensor by Touch\n", __func__);
+			psensor_enable_by_touch_driver(1);
+		} else if(ts->psensor_phone_enable == 0 ) {
+			if(ts->psensor_status != 3)
+				ts->psensor_resume_enable = 2;
+			ts->psensor_phone_enable = 1;
 		}
 	}
 
