@@ -927,6 +927,7 @@ static ssize_t baseband_xmm_onoff(struct device *dev,
 	/* check input */
 	if (buf == NULL) {
 		pr_err("%s: buf NULL\n", __func__);
+		mutex_unlock(&baseband_xmm_onoff_lock);
 		return -EINVAL;
 	}
 	/* pr_debug("%s: count=%d\n", __func__, count); */
@@ -942,6 +943,7 @@ static ssize_t baseband_xmm_onoff(struct device *dev,
 	size = sscanf(buf, "%d", &power_onoff);
 	if (size != 1) {
 		pr_err("%s: size=%d -EINVAL\n", __func__, size);
+		mutex_unlock(&baseband_xmm_onoff_lock);
 		return -EINVAL;
 	}
 #endif /* !BB_XMM_OEM1 */
