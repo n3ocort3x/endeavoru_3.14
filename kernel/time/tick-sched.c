@@ -330,8 +330,8 @@ void tick_nohz_stop_sched_tick(int inidle)
 
 	if (rcu_needs_cpu(cpu) || printk_needs_cpu(cpu) ||
 	    arch_needs_cpu(cpu)) {
-		next_jiffies = last_jiffies + jiffies_per_tick;
-		delta_jiffies = jiffies_per_tick;
+		next_jiffies = last_jiffies + 1;
+		delta_jiffies = 1;
 	} else {
 		/* Get the next timer wheel timer */
 		next_jiffies = get_next_timer_interrupt(last_jiffies);
@@ -341,11 +341,11 @@ void tick_nohz_stop_sched_tick(int inidle)
 	 * Do not stop the tick, if we are only one off
 	 * or if the cpu is required for rcu
 	 */
-	if (!ts->tick_stopped && delta_jiffies == jiffies_per_tick)
+	if (!ts->tick_stopped && delta_jiffies == 1)
 		goto out;
 
 	/* Schedule the tick, if we are at least one jiffie off */
-	if ((long)delta_jiffies >= jiffies_per_tick) {
+	if ((long)delta_jiffies >= 1) {
 
 		/*
 		 * If this cpu is the one which updates jiffies, then
@@ -394,7 +394,7 @@ void tick_nohz_stop_sched_tick(int inidle)
 		else
 			expires.tv64 = KTIME_MAX;
 
-		if (delta_jiffies > jiffies_per_tick)
+		if (delta_jiffies > 1)
 			cpumask_set_cpu(cpu, nohz_cpu_mask);
 
 		/* Skip reprogram of event if its not changed */
@@ -695,6 +695,7 @@ static inline void tick_check_nohz(int cpu)
 		tick_nohz_kick_tick(cpu, now);
 	}
 }
+
 #else
 
 static inline void tick_nohz_switch_to_nohz(void) { }
@@ -720,30 +721,30 @@ static void update_rq_stats(void)
 	unsigned long jiffy_gap = 0;
 	unsigned int rq_avg = 0;
 	unsigned long flags = 0;
-
+    
 	jiffy_gap = jiffies - rq_info.rq_poll_last_jiffy;
-
+    
 	if (jiffy_gap >= rq_info.rq_poll_jiffies) {
-
+        
 		spin_lock_irqsave(&rq_lock, flags);
-
+        
 		if (!rq_info.rq_avg)
 			rq_info.rq_poll_total_jiffies = 0;
-
+        
 		rq_avg = nr_running() * 10;
-
+        
 		if (rq_info.rq_poll_total_jiffies) {
 			rq_avg = (rq_avg * jiffy_gap) +
-				(rq_info.rq_avg *
-				 rq_info.rq_poll_total_jiffies);
+            (rq_info.rq_avg *
+             rq_info.rq_poll_total_jiffies);
 			do_div(rq_avg,
 			       rq_info.rq_poll_total_jiffies + jiffy_gap);
 		}
-
+        
 		rq_info.rq_avg =  rq_avg;
 		rq_info.rq_poll_total_jiffies += jiffy_gap;
 		rq_info.rq_poll_last_jiffy = jiffies;
-
+        
 		spin_unlock_irqrestore(&rq_lock, flags);
 	}
 }
@@ -751,9 +752,9 @@ static void update_rq_stats(void)
 static void wakeup_user(void)
 {
 	unsigned long jiffy_gap;
-
+    
 	jiffy_gap = jiffies - rq_info.def_timer_last_jiffy;
-
+    
 	if (jiffy_gap >= rq_info.def_timer_jiffies) {
 		rq_info.def_timer_last_jiffy = jiffies;
 		queue_work(rq_wq, &rq_info.def_timer_work);
@@ -806,14 +807,14 @@ static enum hrtimer_restart tick_sched_timer(struct hrtimer *timer)
 		}
 		update_process_times(user_mode(regs));
 		profile_tick(CPU_PROFILING);
-
-		if ((rq_info.init == 1) && (cpu == 0)) {
-
+        
+        if ((rq_info.init == 1) && (tick_do_timer_cpu == cpu)) {
+            
 			/*
 			 * update run queue statistics
 			 */
 			update_rq_stats();
-
+            
 			/*
 			 * wakeup user if needed
 			 */
@@ -924,4 +925,3 @@ int tick_check_oneshot_change(int allow_nohz)
 	tick_nohz_switch_to_nohz();
 	return 0;
 }
-
